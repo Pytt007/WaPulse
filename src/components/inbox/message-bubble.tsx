@@ -252,7 +252,7 @@ export function MessageBubble({
         {message.sender_type === "bot" && (
           <div className="mb-1.5 flex items-center gap-1 rounded-full bg-violet-950/50 border border-violet-400/20 px-2 py-0.5 text-[9px] font-semibold text-violet-200 w-fit select-none shadow-sm">
             <Bot className="h-3 w-3 animate-pulse text-violet-300" />
-            <span>Répondu par l'IA</span>
+            <span>Répondu par l&apos;IA</span>
           </div>
         )}
         {reply && (

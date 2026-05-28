@@ -23,6 +23,15 @@ import { ReplyQuote } from "./reply-quote";
 import { useTranslation } from "@/hooks/use-translation";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
+import type { Contact } from "@/types";
+import { createClient } from "@/lib/supabase/client";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ReplyDraft {
   /** Internal UUID of the message being replied to — sent back through onSend. */
@@ -75,9 +84,46 @@ export function MessageComposer({
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   
+  // Contact Picker
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsSearch, setContactsSearch] = useState("");
+  const [contactsLoading, setContactsLoading] = useState(false);
+
   // Popovers
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+
+  useEffect(() => {
+    if (!contactPickerOpen) return;
+
+    const fetchContacts = async () => {
+      setContactsLoading(true);
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("Failed to fetch contacts for picker:", error);
+      } else {
+        setContacts(data ?? []);
+      }
+      setContactsLoading(false);
+    };
+
+    fetchContacts();
+  }, [contactPickerOpen]);
+
+  const filteredContacts = contacts.filter((c) => {
+    const q = contactsSearch.toLowerCase();
+    const name = c.name?.toLowerCase() ?? "";
+    const phone = c.phone.toLowerCase();
+    const email = c.email?.toLowerCase() ?? "";
+    const company = c.company?.toLowerCase() ?? "";
+    return name.includes(q) || phone.includes(q) || email.includes(q) || company.includes(q);
+  });
 
   // Audio Recording
   const [isRecording, setIsRecording] = useState(false);
@@ -293,9 +339,10 @@ export function MessageComposer({
     setAttachOpen(false);
   };
 
-  // Share Contact (Mock info)
+  // Share Contact (Open Picker Dialog)
   const handleShareContact = () => {
-    onSend("👤 Alice Martin\n📞 +33 6 12 34 56 78", replyTo?.id);
+    setContactsSearch("");
+    setContactPickerOpen(true);
     setAttachOpen(false);
   };
 
@@ -541,7 +588,7 @@ export function MessageComposer({
           <div className="flex items-center gap-3 flex-1 px-4">
             {/* Flashing red recording indicator */}
             <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-            <span className="text-xs font-semibold text-slate-300 min-w-8">
+            <span className="text-xs font-semibold text-slate-300 min-w-[2rem]">
               {formatDuration(recordDuration)}
             </span>
 
@@ -742,6 +789,77 @@ export function MessageComposer({
           Type &apos;/&apos; for quick replies
         </p>
       )}
+
+      {/* Dialog for contact sharing */}
+      <Dialog open={contactPickerOpen} onOpenChange={setContactPickerOpen}>
+        <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-white rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-white">
+              {t("Share a contact")}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={contactsSearch}
+              onChange={(e) => setContactsSearch(e.target.value)}
+              placeholder={t("Search a contact...")}
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-violet-500/50"
+            />
+
+            <ScrollArea className="h-64 rounded-lg border border-slate-800/80 bg-slate-950/45 p-2">
+              {contactsLoading ? (
+                <div className="flex h-full items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                </div>
+              ) : filteredContacts.length === 0 ? (
+                <div className="py-12 text-center text-sm text-slate-500">
+                  {t("No contacts found")}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {filteredContacts.map((c) => {
+                    const displayName = c.name || c.phone;
+                    const initials = displayName.charAt(0).toUpperCase();
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          const contactText = `👤 ${displayName}\n📞 ${c.phone}${c.email ? `\n✉️ ${c.email}` : ""}${c.company ? `\n🏢 ${c.company}` : ""}`;
+                          onSend(contactText, replyTo?.id);
+                          setContactPickerOpen(false);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-medium text-white">
+                          {c.avatar_url ? (
+                            <img
+                              src={c.avatar_url}
+                              alt={displayName}
+                              className="h-9 w-9 rounded-full object-cover"
+                            />
+                          ) : (
+                            initials
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-white">
+                            {displayName}
+                          </p>
+                          <p className="truncate text-xs text-slate-400">
+                            {c.phone}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

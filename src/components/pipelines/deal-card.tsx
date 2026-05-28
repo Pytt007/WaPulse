@@ -1,7 +1,7 @@
 "use client";
 
 import type { Deal, PipelineStage } from "@/types";
-import { Calendar, Check, X } from "lucide-react";
+import { Calendar, Check, X, ShoppingCart } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 
 interface DealCardProps {
@@ -57,18 +57,26 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         <h4 className="flex-1 text-sm font-semibold leading-snug text-white break-words">
           {deal.title}
         </h4>
-        {deal.status === "won" && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
-            <Check className="h-3 w-3" />
-            Won
-          </span>
-        )}
-        {deal.status === "lost" && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400">
-            <X className="h-3 w-3" />
-            Lost
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {deal.status === "won" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
+              <Check className="h-3 w-3" />
+              Won
+            </span>
+          )}
+          {deal.status === "lost" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400">
+              <X className="h-3 w-3" />
+              Lost
+            </span>
+          )}
+          {deal.order_id && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-emerald-400 animate-fade-in" title="Commande liée">
+              <ShoppingCart className="h-2.5 w-2.5" />
+              Commande
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Contact row */}

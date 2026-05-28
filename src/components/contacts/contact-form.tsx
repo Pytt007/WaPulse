@@ -15,7 +15,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 
 interface ContactFormProps {
@@ -55,6 +54,7 @@ export function ContactForm({
       setSelectedTagIds(contactTags.map((ct) => ct.tag_id));
       fetchTags();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, contact]);
 
   async function fetchTags() {
@@ -154,7 +154,7 @@ export function ContactForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-md">
+      <DialogContent className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">
             {isEdit ? 'Edit Contact' : 'Add Contact'}

@@ -159,40 +159,40 @@
       "id": "conv-1",
       "user_id": "00000000-0000-0000-0000-000000000000",
       "contact_id": "c-1",
-      "status": "open",
+      "status": "pending",
       "assigned_agent_id": "00000000-0000-0000-0000-000000000000",
       "last_message_text": "Bonjour !",
       "last_message_at": "2026-05-21T18:13:09.926Z",
       "unread_count": 0,
-      "ai_paused": false,
+      "ai_paused": true,
       "created_at": "2026-05-20T16:00:00Z",
-      "updated_at": "2026-05-22T11:10:01.663Z"
+      "updated_at": "2026-05-24T08:53:58.740Z"
     },
     {
       "id": "conv-2",
       "user_id": "00000000-0000-0000-0000-000000000000",
       "contact_id": "c-2",
-      "status": "pending",
+      "status": "closed",
       "assigned_agent_id": "00000000-0000-0000-0000-000000000000",
       "last_message_text": "Pouvez-vous me donner les tarifs pour 15 utilisateurs ?",
       "last_message_at": "2026-05-20T15:30:00Z",
       "unread_count": 0,
       "ai_paused": false,
       "created_at": "2026-05-20T15:00:00Z",
-      "updated_at": "2026-05-20T17:13:55.864Z"
+      "updated_at": "2026-05-24T08:12:48.227Z"
     },
     {
       "id": "conv-3",
       "user_id": "00000000-0000-0000-0000-000000000000",
       "contact_id": "c-3",
-      "status": "open",
+      "status": "closed",
       "assigned_agent_id": null,
       "last_message_text": "Bonjour, j'ai un problème avec mon compte WhatsApp Business.",
       "last_message_at": "2026-05-20T17:00:00Z",
       "unread_count": 0,
       "ai_paused": false,
       "created_at": "2026-05-20T17:00:00Z",
-      "updated_at": "2026-05-20T17:13:57.521Z"
+      "updated_at": "2026-05-24T08:13:08.130Z"
     },
     {
       "id": "conv-sandbox",
@@ -200,12 +200,12 @@
       "contact_id": "c-sandbox",
       "status": "open",
       "assigned_agent_id": "00000000-0000-0000-0000-000000000000",
-      "last_message_text": "Prêt pour le test",
-      "last_message_at": "2026-05-21T10:00:00Z",
+      "last_message_text": "Bonjour salut, merci de nous avoir contactés. Comment pouvons-nous vous aider aujourd'hui ?",
+      "last_message_at": "2026-05-25T13:04:19.808Z",
       "unread_count": 0,
       "ai_paused": false,
       "created_at": "2026-05-21T10:00:00Z",
-      "updated_at": "2026-05-21T10:00:00Z"
+      "updated_at": "2026-05-25T13:04:19.827Z"
     }
   ],
   "messages": [
@@ -268,6 +268,21 @@
       "content_text": "Bonjour, j'ai un problème avec mon compte WhatsApp Business.",
       "status": "sent",
       "created_at": "2026-05-20T17:00:00Z"
+    },
+    {
+      "id": "fba1ca62-29ff-46a8-9184-2cebfa6c1a20",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T13:04:19.807Z",
+      "updated_at": "2026-05-25T13:04:19.807Z",
+      "conversation_id": "conv-sandbox",
+      "sender_type": "agent",
+      "content_type": "template",
+      "content_text": "Bonjour salut, merci de nous avoir contactés. Comment pouvons-nous vous aider aujourd'hui ?",
+      "media_url": null,
+      "template_name": "welcome_premium",
+      "message_id": "mock-wa-msg-1779714259805",
+      "status": "sent",
+      "reply_to_message_id": null
     }
   ],
   "whatsapp_config": [
@@ -276,7 +291,7 @@
       "user_id": "00000000-0000-0000-0000-000000000000",
       "phone_number_id": "1098492029482",
       "waba_id": "2039482049281",
-      "access_token": "fd45fa5a0aa1e6439b575a24:454b75bf27541c61936a67b82c700879ee:38cba5190782f886bf9b760ac5b89e3a",
+      "access_token": "c4a5c144b4fe5ab6cfdf8d9c:0ebed7f648c9c9839b0bea360a2018a066:02e2dbe8b73e388a4d9650259d150f58",
       "verify_token": "waconnect_verify_secret_token",
       "status": "connected",
       "connected_at": "2026-05-18T10:00:00Z"
@@ -304,6 +319,13 @@
       "user_id": "00000000-0000-0000-0000-000000000000",
       "name": "Pipeline Ventes",
       "created_at": "2026-05-18T10:00:00Z"
+    },
+    {
+      "id": "f79f85c3-fe3f-4ca2-a51c-475ea1e792d0",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T17:49:34.358Z",
+      "updated_at": "2026-05-25T17:49:34.358Z",
+      "name": "test"
     }
   ],
   "pipeline_stages": [
@@ -346,6 +368,56 @@
       "position": 4,
       "color": "#10b981",
       "created_at": "2026-05-18T10:00:00Z"
+    },
+    {
+      "id": "85a7e69f-5b29-4e17-a00f-06c2291a67cc",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T17:49:34.400Z",
+      "updated_at": "2026-05-25T17:49:34.400Z",
+      "pipeline_id": "f79f85c3-fe3f-4ca2-a51c-475ea1e792d0",
+      "name": "New Lead",
+      "color": "#3b82f6",
+      "position": 0
+    },
+    {
+      "id": "e1278435-61c1-4b4c-9db3-9c22fad1ca13",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T17:49:34.400Z",
+      "updated_at": "2026-05-25T17:49:34.400Z",
+      "pipeline_id": "f79f85c3-fe3f-4ca2-a51c-475ea1e792d0",
+      "name": "Qualified",
+      "color": "#eab308",
+      "position": 1
+    },
+    {
+      "id": "b6b8ed11-80c6-49ca-beb9-41453033ca3c",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T17:49:34.400Z",
+      "updated_at": "2026-05-25T17:49:34.400Z",
+      "pipeline_id": "f79f85c3-fe3f-4ca2-a51c-475ea1e792d0",
+      "name": "Proposal Sent",
+      "color": "#f97316",
+      "position": 2
+    },
+    {
+      "id": "50b4afb8-3815-48fa-8d80-abc31ec29fd2",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T17:49:34.401Z",
+      "updated_at": "2026-05-25T17:49:34.401Z",
+      "pipeline_id": "f79f85c3-fe3f-4ca2-a51c-475ea1e792d0",
+      "name": "Negotiation",
+      "color": "#8b5cf6",
+      "position": 3
+    },
+    {
+      "id": "e5ce3e29-44ab-4cfa-bb08-53663b32af1a",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T17:49:34.401Z",
+      "updated_at": "2026-05-25T17:49:34.401Z",
+      "pipeline_id": "f79f85c3-fe3f-4ca2-a51c-475ea1e792d0",
+      "name": "Won",
+      "color": "#22c55e",
+      "position": 4
     }
   ],
   "deals": [
@@ -353,7 +425,7 @@
       "id": "d-1",
       "user_id": "00000000-0000-0000-0000-000000000000",
       "pipeline_id": "p-1",
-      "stage_id": "s-3",
+      "stage_id": "s-5",
       "contact_id": "c-1",
       "conversation_id": "conv-1",
       "title": "Licences Martin SAS",
@@ -362,13 +434,13 @@
       "notes": "Intéressés par 10 licences annuelles.",
       "status": "open",
       "created_at": "2026-05-19T10:00:00Z",
-      "updated_at": "2026-05-22T14:41:29.067Z"
+      "updated_at": "2026-05-25T18:57:30.735Z"
     },
     {
       "id": "d-2",
       "user_id": "00000000-0000-0000-0000-000000000000",
       "pipeline_id": "p-1",
-      "stage_id": "s-2",
+      "stage_id": "s-4",
       "contact_id": "c-2",
       "conversation_id": "conv-2",
       "title": "Projet CRM TechCorp",
@@ -376,7 +448,11 @@
       "currency": "EUR",
       "notes": "Besoin de sur-mesure pour intégration CRM.",
       "status": "open",
-      "created_at": "2026-05-20T11:00:00Z"
+      "created_at": "2026-05-20T11:00:00Z",
+      "updated_at": "2026-05-25T21:50:53.432Z",
+      "assigned_to": null,
+      "expected_close_date": null,
+      "order_id": null
     }
   ],
   "broadcasts": [
@@ -457,7 +533,13 @@
       "sku": "WAP-SaaS-STD",
       "active": true,
       "created_at": "2026-05-18T10:00:00Z",
-      "updated_at": "2026-05-18T10:00:00Z"
+      "updated_at": "2026-05-25T14:07:28.667Z",
+      "images": [
+        "/uploads/1779718046557-Capture_d__cran_2026_05_24_085410.png",
+        "/uploads/1779718046502-Capture_d__cran_2026_05_25_130039.png",
+        "/uploads/1779718046559-Capture_d__cran_2026_05_25_135829.png"
+      ],
+      "image_url": "/uploads/1779718046557-Capture_d__cran_2026_05_24_085410.png"
     },
     {
       "id": "p-2",
@@ -494,6 +576,19 @@
       "active": true,
       "created_at": "2026-05-19T08:00:00Z",
       "updated_at": "2026-05-19T08:00:00Z"
+    },
+    {
+      "id": "f6e28dfb-3c18-40de-bfe7-dd5cb8eb2f0c",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T18:08:47.196Z",
+      "updated_at": "2026-05-25T18:08:47.196Z",
+      "name": "test",
+      "description": "qsdqsdqs",
+      "price": 100,
+      "currency": "XOF",
+      "sku": "qsdqs",
+      "active": true,
+      "images": []
     }
   ],
   "orders": [
@@ -503,7 +598,7 @@
       "contact_id": "c-1",
       "total_amount": 209,
       "currency": "EUR",
-      "status": "paid",
+      "status": "cancelled",
       "payment_method": "stripe",
       "items": [
         {
@@ -518,30 +613,7 @@
         }
       ],
       "created_at": "2026-05-20T11:00:00Z",
-      "updated_at": "2026-05-20T11:00:00Z"
-    },
-    {
-      "id": "o-2",
-      "user_id": "00000000-0000-0000-0000-000000000000",
-      "contact_id": "c-2",
-      "total_amount": 348,
-      "currency": "EUR",
-      "status": "paid",
-      "payment_method": "stripe",
-      "items": [
-        {
-          "product_id": "p-2",
-          "quantity": 1,
-          "price": 99
-        },
-        {
-          "product_id": "p-3",
-          "quantity": 1,
-          "price": 249
-        }
-      ],
-      "created_at": "2026-05-20T14:30:00Z",
-      "updated_at": "2026-05-20T14:30:00Z"
+      "updated_at": "2026-05-25T20:59:14.428Z"
     },
     {
       "id": "o-3",
@@ -578,6 +650,24 @@
       ],
       "created_at": "2026-05-19T10:00:00Z",
       "updated_at": "2026-05-19T10:00:00Z"
+    },
+    {
+      "id": "2b4a03f5-f1cf-4e8b-838f-800fe4b1ad3a",
+      "user_id": "00000000-0000-0000-0000-000000000000",
+      "created_at": "2026-05-25T18:56:42.460Z",
+      "updated_at": "2026-05-25T18:56:42.460Z",
+      "contact_id": "c-1",
+      "total_amount": 100,
+      "currency": "XOF",
+      "status": "pending",
+      "payment_method": "stripe",
+      "items": [
+        {
+          "product_id": "f6e28dfb-3c18-40de-bfe7-dd5cb8eb2f0c",
+          "quantity": 1,
+          "price": 100
+        }
+      ]
     }
   ],
   "ai_agents": [

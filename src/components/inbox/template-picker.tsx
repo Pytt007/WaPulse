@@ -134,7 +134,7 @@ export function TemplatePicker({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-lg">
+      <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
             <LayoutTemplate className="h-4 w-4 text-violet-400" />

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import { useTranslation } from "@/hooks/use-translation";
 import { Currency, SUPPORTED_CURRENCIES, convertCurrency } from "@/lib/currency";
 
@@ -19,17 +19,15 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const { language } = useTranslation();
-  const [currency, setCurrencyState] = useState<Currency>("XOF");
-
-  // Read preferences on mount
-  useEffect(() => {
+  const [currency, setCurrencyState] = useState<Currency>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("wapulse_currency");
       if (stored && SUPPORTED_CURRENCIES.includes(stored as Currency)) {
-        setCurrencyState(stored as Currency);
+        return stored as Currency;
       }
     }
-  }, []);
+    return "XOF";
+  });
 
   const setCurrency = useCallback((newCurrency: Currency) => {
     setCurrencyState(newCurrency);
@@ -54,8 +52,25 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       const convertedValue = convertCurrency(value, sourceCurrency, currency);
       const locale = language === "fr" ? "fr-FR" : "en-US";
 
-      // By default, XOF has no fractional digits, whereas EUR/USD/GBP have 2.
+      // By default, XOF has no fractional digits, whereas EUR/USD have 2.
       const defaultFractionDigits = currency === "XOF" ? 0 : 2;
+
+      if (currency === "XOF") {
+        const formattedNum = new Intl.NumberFormat(locale, {
+          style: "decimal",
+          minimumFractionDigits:
+            options?.minimumFractionDigits !== undefined
+              ? options.minimumFractionDigits
+              : defaultFractionDigits,
+          maximumFractionDigits:
+            options?.maximumFractionDigits !== undefined
+              ? options.maximumFractionDigits
+              : defaultFractionDigits,
+          ...options,
+        }).format(convertedValue);
+        // Replace non-breaking space with regular space for clean styling
+        return `${formattedNum} XOF`.replace(/\u202f|\u00a0/g, " ");
+      }
 
       return new Intl.NumberFormat(locale, {
         style: "currency",

@@ -173,6 +173,8 @@ export interface Deal {
   contact?: Contact;
   stage?: PipelineStage;
   assignee?: Profile;
+  order_id?: string;
+  order?: Order;
 }
 
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
@@ -399,6 +401,7 @@ export interface Product {
   price: number;
   currency: string;
   image_url?: string;
+  images?: string[];
   sku?: string;
   active: boolean;
   created_at: string;
@@ -408,7 +411,8 @@ export interface Product {
 export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'shipped';
 
 export interface OrderItem {
-  product_id: string;
+  product_id?: string | null;
+  name?: string;
   quantity: number;
   price: number;
   product?: Product;

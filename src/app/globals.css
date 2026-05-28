@@ -46,9 +46,75 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Map standard slate colors to CSS variables so we can dynamically swap them */
+  --color-slate-50: var(--slate-50);
+  --color-slate-100: var(--slate-100);
+  --color-slate-200: var(--slate-200);
+  --color-slate-300: var(--slate-300);
+  --color-slate-400: var(--slate-400);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-900: var(--slate-900);
+  --color-slate-950: var(--slate-950); /* Maps to #ffffff in root and #020617 in .dark */
+  --color-slate-955: var(--slate-955);
+  --color-white: var(--white);
 }
 
 :root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #f8fafc;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: oklch(0.526 0.247 293);
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: oklch(0.526 0.247 293);
+  --chart-1: oklch(0.526 0.247 293);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: oklch(0.526 0.247 293);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e2e8f0;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: oklch(0.526 0.247 293);
+
+  /* Light mode slate variables */
+  --slate-950: #ffffff;
+  --slate-955: #ffffff;
+  --slate-900: #f8fafc;
+  --slate-850: #f1f5f9;
+  --slate-800: #e2e8f0;
+  --slate-700: #cbd5e1;
+  --slate-600: #94a3b8;
+  --slate-500: #64748b;
+  --slate-400: #475569;
+  --slate-300: #334155;
+  --slate-200: #1e293b;
+  --slate-100: #0f172a;
+  --slate-50: #020617;
+  --white: #0f172a;
+}
+
+.dark {
   --background: oklch(0.13 0.01 260);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.18 0.01 260);
@@ -72,7 +138,6 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
   --sidebar: oklch(0.16 0.01 260);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.526 0.247 293);
@@ -81,6 +146,57 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.28 0.01 260);
   --sidebar-ring: oklch(0.526 0.247 293);
+
+  /* Dark mode slate variables */
+  --slate-950: #020617;
+  --slate-955: #020617;
+  --slate-900: #0f172a;
+  --slate-850: #1e293b;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --slate-50: #f8fafc;
+  --white: #ffffff;
+}
+
+/* Light mode overrides to handle text-white and dropdown visibility */
+:root:not(.dark) {
+  .text-white {
+    color: var(--white) !important;
+  }
+
+  button.bg-violet-600,
+  button.bg-violet-700,
+  button.bg-red-600,
+  button.bg-red-700,
+  button.bg-emerald-600,
+  button.bg-emerald-700,
+  button.bg-amber-600,
+  button.bg-amber-700,
+  .bg-violet-600,
+  .bg-violet-500,
+  .bg-red-600,
+  .bg-emerald-600,
+  .bg-amber-600,
+  .bg-blue-600 {
+    &, .text-white, span, h1, h2, h3, h4, h5, h6, svg {
+      color: #ffffff !important;
+    }
+  }
+
+  select {
+    color: var(--slate-100) !important;
+    background-color: var(--slate-900) !important;
+    option {
+      color: var(--slate-100) !important;
+      background-color: var(--slate-900) !important;
+    }
+  }
 }
 
 @layer base {
@@ -92,5 +208,35 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* Custom Modern Scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.2); /* Subtle violet matching the design system */
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.4);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* Firefox support */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.2) transparent;
   }
 }

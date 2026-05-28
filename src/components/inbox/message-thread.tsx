@@ -11,16 +11,14 @@ import type {
   Contact,
   ConversationStatus,
   MessageTemplate,
-  Profile,
 } from "@/types";
 import {
   MessageSquare,
   ChevronDown,
-  UserPlus,
-  Check,
   Clock,
   ArrowLeft,
   Bot,
+  Info,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -29,15 +27,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MessageBubble } from "./message-bubble";
 import { MessageActions } from "./message-actions";
 import { MessageComposer } from "./message-composer";
 import { TemplatePicker } from "./template-picker";
 import { buildReplyPreview } from "./reply-quote";
+import { ContactSidebar } from "./contact-sidebar";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -123,32 +126,10 @@ export function MessageThread({
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
+  const [contactSheetOpen, setContactSheetOpen] = useState(false);
 
-  // Profiles are bounded by RLS to rows the current user is allowed to
-  // see — today that's just the current user, but the dropdown keeps the
-  // shape ready for shared-team workspaces without a refactor.
-  useEffect(() => {
-    let cancelled = false;
-    const supabase = createClient();
-    supabase
-      .from("profiles")
-      .select("*")
-      .order("full_name")
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error("Failed to fetch profiles:", error);
-          return;
-        }
-        setProfiles((data as Profile[]) ?? []);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // 24-hour session timer
   const sessionInfo = useMemo(() => {
@@ -597,29 +578,9 @@ export function MessageThread({
         setReactions(snapshot);
       }
     },
-    [conversation, user?.id],
+    [conversation, user?.id, t],
   );
 
-  const handleAssignChange = useCallback(
-    async (agentId: string | null) => {
-      if (!conversation) return;
-
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("conversations")
-        .update({ assigned_agent_id: agentId })
-        .eq("id", conversation.id);
-
-      if (error) {
-        console.error("Failed to update assignment:", error);
-        toast.error(t("Failed to update assignment"));
-        return;
-      }
-
-      onAssignChange(conversation.id, agentId);
-    },
-    [conversation, onAssignChange],
-  );
 
   // Empty state
   if (!conversation || !contact) {
@@ -643,11 +604,6 @@ export function MessageThread({
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status
   );
-  const assignedAgentId = conversation.assigned_agent_id ?? null;
-  const currentAssignee = profiles.find((p) => p.user_id === assignedAgentId);
-  const assignLabel = assignedAgentId
-    ? (currentAssignee?.full_name ?? t("Assigned"))
-    : t("Assign");
 
   return (
     <div className="flex flex-1 flex-col bg-slate-950">
@@ -733,11 +689,15 @@ export function MessageThread({
           {/* Status dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className={cn(
-                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-slate-800",
-                  currentStatus?.color ?? "text-slate-400"
+                  "inline-flex items-center justify-center h-7 gap-1.5 px-2.5 text-xs font-semibold rounded-md border transition-colors focus:outline-none",
+                  conversation.status === "open"
+                    ? "bg-violet-500/10 text-violet-400 border-violet-500/20 hover:bg-violet-500/20"
+                    : conversation.status === "pending"
+                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+                      : "bg-slate-500/10 text-slate-400 border-slate-700 hover:bg-slate-550/20"
                 )}>
-                {currentStatus?.label ?? "Status"}
-                <ChevronDown className="h-3 w-3" />
+                {currentStatus ? t(currentStatus.label) : t("Status")}
+                <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
@@ -747,70 +707,58 @@ export function MessageThread({
                 <DropdownMenuItem
                   key={opt.value}
                   onClick={() => handleStatusChange(opt.value)}
-                  className={cn("text-sm", opt.color)}
+                  className={cn(
+                    "text-xs font-semibold px-2 py-1.5 cursor-pointer transition-colors focus:bg-slate-700/60",
+                    opt.value === "open"
+                      ? "text-violet-400 focus:text-violet-300"
+                      : opt.value === "pending"
+                        ? "text-amber-400 focus:text-amber-300"
+                        : "text-slate-400 focus:text-slate-300"
+                  )}
                 >
-                  {opt.label}
+                  <span className={cn(
+                    "mr-2 inline-block h-1.5 w-1.5 shrink-0 rounded-full",
+                    opt.value === "open"
+                      ? "bg-violet-400"
+                      : opt.value === "pending"
+                        ? "bg-amber-400"
+                        : "bg-slate-400"
+                  )} />
+                  {t(opt.label)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Assign dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={cn(
-                "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-slate-800",
-                assignedAgentId ? "text-violet-400" : "text-slate-400"
-              )}
-            >
-            <UserPlus className="h-3 w-3" />
-            <span className="hidden sm:inline">{assignLabel}</span>
-            <ChevronDown className="h-3 w-3" />
-          </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="border-slate-700 bg-slate-800"
-            >
-            {profiles.length === 0 ? (
-              <DropdownMenuItem disabled className="text-sm text-slate-500">
-                {t("No teammates available")}
-              </DropdownMenuItem>
-            ) : (
-                profiles.map((p) => {
-                  const isSelected = p.user_id === assignedAgentId;
-                  return (
-                    <DropdownMenuItem
-                      key={p.id}
-                      onClick={() => handleAssignChange(p.user_id)}
-                      className={cn(
-                        "text-sm",
-                        isSelected ? "text-violet-400" : "text-slate-300"
-                      )}
-                    >
-                      <span className="flex-1">
-                        {p.full_name}
-                        {p.user_id === user?.id ? ` (${t("me")})` : ""}
-                      </span>
-                      {isSelected && <Check className="ml-2 h-3 w-3" />}
-                    </DropdownMenuItem>
-                  );
-                })
-              )}
-              {assignedAgentId && (
-                <>
-                  <DropdownMenuSeparator className="bg-slate-700" />
-                <DropdownMenuItem
-                  onClick={() => handleAssignChange(null)}
-                  className="text-sm text-slate-400"
-                >
-                  {t("Unassign")}
-                </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Mobile contact info button — opens a Sheet drawer.
+              Hidden on lg+ where ContactSidebar is always visible. */}
+          <button
+            type="button"
+            onClick={() => setContactSheetOpen(true)}
+            aria-label={t("Contact info")}
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+          >
+            <Info className="h-5 w-5" />
+          </button>
         </div>
       </div>
+
+      {/* Mobile contact info Sheet — only rendered when open so it doesn't
+          create a hidden DOM subtree on desktop where the sidebar already
+          renders in the page layout. */}
+      <Dialog open={contactSheetOpen} onOpenChange={setContactSheetOpen}>
+        <DialogContent
+          className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-md max-h-[85vh] p-0 overflow-hidden flex flex-col"
+        >
+          <DialogHeader className="border-b border-slate-800 px-4 py-3 shrink-0">
+            <DialogTitle className="text-sm font-semibold text-white">
+              {t("Contact info")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1">
+            <ContactSidebar contact={contact} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Messages Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">

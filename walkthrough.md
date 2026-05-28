@@ -208,4 +208,83 @@ This feature integrates the WhatsApp Cloud API Catalog/Cart checkout webhooks, a
 - **Zero compiler errors**: Running `npm run typecheck` completes cleanly with no warnings or errors.
 - **All tests passing**: Running `npm run test` executes successfully, with 114/114 test cases passing (including the new webhook order tracking verification).
 
+---
+
+## 🛒 Liaison Sales Pipeline (Deals) & Suivi de Commandes (Orders)
+
+Cette fonctionnalité permet de connecter le flux de vente (opportunités/deals) et le suivi des commandes physiques (orders).
+
+### 🛠️ Modifications Implémentées
+
+#### 1. Modèles de données & Base de données fictive
+- **[MODIFY] Types du projet**: [index.ts](file:///d:/Application/WaPulse/src/types/index.ts)
+  - Ajout de `order_id` (UUID) et de la relation facultative `order` dans l'interface `Deal`.
+  - Mise à jour de `OrderItem` pour rendre `product_id` optionnel/nullable et ajouter le champ `name` pour soutenir les articles personnalisés sans produit catalogue lié.
+- **[MODIFY] Enrichissement Mock DB**: [mock-db-server.ts](file:///d:/Application/WaPulse/src/lib/supabase/mock-db-server.ts)
+  - Enrichissement automatique de la relation `deal.order` via `enrichRecord` pour la table `deals`.
+- **[NEW] Fichier de Migration**: [011_deals_order_link.sql](file:///d:/Application/WaPulse/supabase/migrations/011_deals_order_link.sql)
+  - Migration SQL ajoutant la colonne `order_id` référençant `orders(id) ON DELETE SET NULL` sur la table `deals`.
+
+#### 2. Expérience Utilisateur (UI/UX)
+- **[MODIFY] Modale de Deal (DealForm)**: [deal-form.tsx](file:///d:/Application/WaPulse/src/components/pipelines/deal-form.tsx)
+  - Lors du clic sur **Mark as Won**, l'agent se voit proposer un panneau de configuration de commande.
+  - Possibilité de lier un produit existant du catalogue (calcul automatique de la quantité pour correspondre au montant) ou de créer un article générique reprenant le titre et la valeur du deal.
+  - Permet de choisir le moyen de paiement (Carte, Mobile Money, Espèces) et le statut initial de la commande.
+  - Si une commande est déjà associée, un lien direct vers la page des commandes s'affiche à côté du statut.
+  - La réouverture du deal remet à blanc le lien de commande pour maintenir la cohérence opérationnelle.
+- **[MODIFY] Liste Kanban (DealCard)**: [deal-card.tsx](file:///d:/Application/WaPulse/src/components/pipelines/deal-card.tsx)
+  - Affiche un badge discret de couleur émeraude avec une icône de caddie 🛒 et le texte "Commande" sur la carte de deal si celui-ci a une commande liée.
+- **[MODIFY] Page de Commandes (OrdersPage)**: [page.tsx](file:///d:/Application/WaPulse/src/app/(dashboard)/dashboard/orders/page.tsx)
+  - Affiche le nom personnalisé (`item.name`) dans les détails de commande si aucun produit catalogue n'est attaché.
+  - Correction d'un problème de typage lors de l'édition d'une commande grâce à un fallback sur le mode de paiement.
+- **Centralisation et Limitation des Devises** :
+  - **[deal-form.tsx](file:///d:/Application/WaPulse/src/components/pipelines/deal-form.tsx)** & **[products/page.tsx](file:///d:/Application/WaPulse/src/app/(dashboard)/dashboard/products/page.tsx)** : Retrait complet des sélecteurs de devise dans les formulaires d'opportunités (deals) et de produits. La devise de création/modification est maintenant verrouillée de manière transparente sur la devise système globale. Le préfixe de la devise active affiche `"XOF"` au lieu de `"CFA"`.
+  - **[currency.ts](file:///d:/Application/WaPulse/src/lib/currency.ts)** : Limitation des devises de l'application à 3 devises seulement : `XOF`, `USD`, et `EUR` (retrait de la devise `GBP`).
+  - **[use-currency.tsx](file:///d:/Application/WaPulse/src/hooks/use-currency.tsx)** : Formatage dynamique des montants `XOF` sous la forme `"X XOF"` (ex: `2 951 807 XOF`) pour remplacer l'intitulé navigateur `F CFA` ou `FCFA` dans toute l'application.
+  - **[header.tsx](file:///d:/Application/WaPulse/src/components/layout/header.tsx)** : Mise à jour du menu de l'en-tête pour renommer l'option `"FCFA (XOF)"` en `"XOF"` et supprimer l'option GBP.
+- **[MODIFY] Requête et déplacement de pipeline**: [page.tsx](file:///d:/Application/WaPulse/src/app/(dashboard)/pipelines/page.tsx)
+  - Ajout de la relation `order:orders(*)` au sélecteur de requête dans `loadDeals` pour charger les commandes liées en temps réel.
+  - Réouverture automatique des opportunités (statut repasse à `open` et lien `order_id` supprimé) lorsqu'un deal ayant le statut "Won" ou "Lost" est déplacé par glisser-déposer (drag-and-drop) vers une autre étape.
+- **[MODIFY] Refactoring de la Vue de Détail de Contact**: [contact-detail-view.tsx](file:///d:/Application/WaPulse/src/components/contacts/contact-detail-view.tsx)
+  - Remplacement de la mise en forme de devise brute `Intl.NumberFormat` par l'utilisation centralisée du hook `useCurrency`. Cela garantit que tous les montants saisis ou visualisés en `XOF` s'affichent correctement sous la forme `"X XOF"` à la place du format natif `"F CFA"`.
+- **[MODIFY] Nettoyage des commentaires**: [currency.ts](file:///d:/Application/WaPulse/src/lib/currency.ts)
+  - Retrait de la référence résiduelle à `"FCFA"` dans la documentation interne.
+
+### 🧪 Tests & Vérification de Type
+- **Aucune erreur de compilation** : L'exécution de `npm run typecheck` se termine avec succès.
+- **Vérification de la mise en cache** : Après ces corrections, veillez à recharger l'application ou vider le cache du navigateur si des données d'affichage obsolètes (comme `F CFA` dans le tableau de bord ou la pipeline) persistent. La logique de formatage côté client a été entièrement corrigée pour renvoyer uniquement `"XOF"`.
+
+---
+
+## 🌓 Mode Sombre / Mode Clair (Theme Switcher)
+
+Cette fonctionnalité apporte le support complet des modes clair et sombre à travers toute l'application. Elle permet d'adapter l'interface pour plus de lisibilité en plein jour tout en préservant le confort du mode sombre historique.
+
+### 🛠️ Modifications Implémentées
+
+#### 1. Gestion d'État et Persistance
+- **[NEW] Hook & Context de Thème**: [use-theme.tsx](file:///d:/Application/WaPulse/src/hooks/use-theme.tsx)
+  - Gère l'état actif (`light` | `dark`) et sa persistance locale dans `localStorage` sous la clé `wapulse_theme`.
+  - Effectue la synchronisation de la classe `.dark` sur `document.documentElement` pour piloter Tailwind.
+- **[MODIFY] Intégration Layout**: [layout.tsx](file:///d:/Application/WaPulse/src/app/layout.tsx)
+  - Enveloppement de l'application sous le `ThemeProvider`.
+  - Injection d'un script bloquant en ligne tout en haut de la balise `<body>` pour appliquer la classe de thème avant le rendu HTML de React, évitant ainsi le clignotement blanc/noir indésirable (flash de chargement).
+
+#### 2. Système de Couleurs & Design Tokens
+- **[MODIFY] Surcharges CSS variables**: [globals.css](file:///d:/Application/WaPulse/src/app/globals.css)
+  - Liaison des classes de couleurs de slate standard (`slate-50` jusqu'à `slate-950` et `slate-955` pour la compatibilité) et de `white` à des variables CSS dynamiques dans le bloc `@theme`.
+  - Définition d'un thème clair par défaut dans `:root` où les slates sombres deviennent des blancs/gris clairs et inversement.
+  - Définition du thème sombre sous `.dark` rétablissant la palette sombre originelle.
+  - Ajout de règles d'exception CSS ciblées pour conserver le texte blanc sur les boutons d'action de couleur (ex. boutons violets, rouges, verts de type `bg-violet-600`) et forcer une apparence lisible sur les menus déroulants natifs `select`.
+
+#### 3. Composants et Intégration UI
+- **[MODIFY] En-tête de l'application**: [header.tsx](file:///d:/Application/WaPulse/src/components/layout/header.tsx)
+  - Import du hook `useTheme` et ajout d'un bouton à bascule interactif Sun ☀️ / Moon 🌙 juste à gauche du sélecteur de devise.
+  - La couleur de l'icône s'adapte automatiquement au thème en cours de manière fluide.
+
+### 🧪 Tests & Validation
+- **Compilation validée** : L'exécution de `tsc --noEmit` via `npm run typecheck` est un succès.
+- **Micro-animations** : Les transitions de hover et les icônes réagissent de façon fluide lors du changement de thème.
+
+
 

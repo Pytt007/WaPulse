@@ -3,22 +3,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import type { Contact, Tag, ContactTag, ContactNote, CustomField, ContactCustomValue, Deal } from '@/types';
+import type { Contact, Tag, ContactNote, CustomField, Deal } from '@/types';
+import { useCurrency } from '@/hooks/use-currency';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Phone,
   Mail,
@@ -29,7 +28,6 @@ import {
   Plus,
   Trash2,
   Save,
-  X,
   DollarSign,
 } from 'lucide-react';
 
@@ -47,6 +45,7 @@ export function ContactDetailView({
   onUpdated,
 }: ContactDetailViewProps) {
   const supabase = createClient();
+  const { format: formatPrice } = useCurrency();
 
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(false);
@@ -324,19 +323,18 @@ export function ContactDetailView({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-lg w-full p-0"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-lg w-full p-0 overflow-hidden flex flex-col max-h-[85vh]"
       >
         {loading || !contact ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center h-48">
             <Loader2 className="size-6 animate-spin text-violet-500" />
           </div>
         ) : (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full overflow-hidden">
             {/* Header */}
-            <SheetHeader className="p-4 border-b border-slate-700/50">
+            <DialogHeader className="p-4 border-b border-slate-700/50">
               <div className="flex items-center gap-3">
                 <Avatar className="size-12 bg-slate-800 border border-slate-700">
                   <AvatarFallback className="bg-violet-500/10 text-violet-400 text-sm font-medium">
@@ -344,12 +342,12 @@ export function ContactDetailView({
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-white truncate">
+                  <DialogTitle className="text-white truncate">
                     {contact.name || 'Unknown'}
-                  </SheetTitle>
-                  <SheetDescription className="text-slate-400 text-xs mt-0.5">
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-400 text-xs mt-0.5">
                     Contact details
-                  </SheetDescription>
+                  </DialogDescription>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-400">
                     <button
                       onClick={copyPhone}
@@ -378,7 +376,7 @@ export function ContactDetailView({
                   </div>
                 </div>
               </div>
-            </SheetHeader>
+            </DialogHeader>
 
             {/* Tabs */}
             <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
@@ -653,11 +651,7 @@ export function ContactDetailView({
                         <div className="mt-1.5 flex items-center justify-between text-xs text-slate-400">
                           <span className="flex items-center gap-1">
                             <DollarSign className="size-3" />
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: deal.currency || 'USD',
-                              maximumFractionDigits: 0,
-                            }).format(Number(deal.value || 0))}
+                            {formatPrice(Number(deal.value || 0), deal.currency || 'XOF')}
                           </span>
                           {deal.status && deal.status !== 'open' && (
                             <span
@@ -679,7 +673,7 @@ export function ContactDetailView({
             </Tabs>
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

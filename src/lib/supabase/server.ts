@@ -2,9 +2,20 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { executeQuery } from './mock-db-server'
 
-class ServerMockQueryBuilder {
+// This is a local-dev server-side mock that mimics the Supabase client shape.
+// The query builder intentionally uses broad types because it proxies
+// arbitrary table schemas — suppress `no-explicit-any` for the whole file.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+interface QueryFilter {
+  col: string
+  op: string
+  val: unknown
+}
+
+export class ServerMockQueryBuilder {
   private tableName: string
-  private filters: any[] = []
+  private filters: QueryFilter[] = []
   private orderCol: string | null = null
   private orderAsc = true
   private rangeStart?: number
@@ -13,34 +24,31 @@ class ServerMockQueryBuilder {
   private isSingle = false
   private isMaybeSingle = false
   private isHead = false
-  private data: any = null
+  private data: unknown = null
   private action: 'select' | 'insert' | 'update' | 'delete' = 'select'
 
   constructor(tableName: string) {
     this.tableName = tableName
   }
 
-  select(fields?: string, options?: { count?: string; head?: boolean }) {
+  select(_fields?: string, options?: { count?: string; head?: boolean }) {
     if (options?.head) this.isHead = true
-    if (this.action === 'select') {
-      this.action = 'select'
-    }
     return this
   }
 
-  insert(data: any) {
+  insert(data: unknown) {
     this.data = data
     this.action = 'insert'
     return this
   }
 
-  upsert(data: any, options?: any) {
+  upsert(data: unknown, _options?: unknown) {
     this.data = data
     this.action = 'insert'
     return this
   }
 
-  update(data: any) {
+  update(data: unknown) {
     this.data = data
     this.action = 'update'
     return this
@@ -51,37 +59,37 @@ class ServerMockQueryBuilder {
     return this
   }
 
-  eq(col: string, val: any) {
+  eq(col: string, val: unknown) {
     this.filters.push({ col, op: 'eq', val })
     return this
   }
 
-  neq(col: string, val: any) {
+  neq(col: string, val: unknown) {
     this.filters.push({ col, op: 'neq', val })
     return this
   }
 
-  gte(col: string, val: any) {
+  gte(col: string, val: unknown) {
     this.filters.push({ col, op: 'gte', val })
     return this
   }
 
-  lte(col: string, val: any) {
+  lte(col: string, val: unknown) {
     this.filters.push({ col, op: 'lte', val })
     return this
   }
 
-  gt(col: string, val: any) {
+  gt(col: string, val: unknown) {
     this.filters.push({ col, op: 'gt', val })
     return this
   }
 
-  lt(col: string, val: any) {
+  lt(col: string, val: unknown) {
     this.filters.push({ col, op: 'lt', val })
     return this
   }
 
-  in(col: string, val: any[]) {
+  in(col: string, val: unknown[]) {
     this.filters.push({ col, op: 'in', val })
     return this
   }
@@ -136,8 +144,9 @@ class ServerMockQueryBuilder {
       })
       if (onfulfilled) return onfulfilled(result)
       return result
-    } catch (err: any) {
-      const errorResult = { data: null, error: { message: err.message }, count: 0 }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      const errorResult = { data: null, error: { message }, count: 0 }
       if (onrejected) return onrejected(err)
       return errorResult
     }
@@ -210,8 +219,8 @@ const mockAuth = {
     }
   },
 
-  onAuthStateChange(callback: (event: string, session: any) => void) {
-    // Return empty unsubscribe, as server components don't listen to state changes
+  onAuthStateChange(_callback: (event: string, session: unknown) => void) {
+    // Server components don't listen to auth state changes.
     return {
       data: {
         subscription: {
@@ -233,13 +242,12 @@ const mockClient = {
     return new ServerMockQueryBuilder(tableName)
   },
   auth: mockAuth,
-  channel(channelName: string) {
+  channel(_channelName: string) {
     return {
-      on(event: string, filter: any, callback: any) {
+      on(_event: string, _filter: unknown, _callback: unknown) {
         return this
       },
-      subscribe(callback: any) {
-        if (callback) callback('SUBSCRIBED')
+      subscribe(_callback?: unknown) {
         return this
       },
       unsubscribe() {
@@ -247,7 +255,7 @@ const mockClient = {
       },
     }
   },
-  removeChannel(channel: any) {
+  removeChannel(_channel: unknown) {
     return Promise.resolve({ error: null })
   },
 }
@@ -255,4 +263,3 @@ const mockClient = {
 export async function createClient() {
   return mockClient as unknown as SupabaseClient
 }
-export { ServerMockQueryBuilder }

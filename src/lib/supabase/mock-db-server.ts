@@ -1,11 +1,15 @@
 import fs from 'fs'
 import path from 'path'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = Record<string, any>
+
 const dbPath = path.join(process.cwd(), 'supabase', 'mock-db.json')
 
 export interface QueryFilter {
   col: string
   op: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   val: any
 }
 
@@ -21,23 +25,24 @@ export interface QueryRequest {
   isSingle?: boolean
   isMaybeSingle?: boolean
   isHead?: boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any
 }
 
-function readDB(): Record<string, any[]> {
+function readDB(): Record<string, AnyRecord[]> {
   try {
     if (!fs.existsSync(dbPath)) {
       return {}
     }
     const content = fs.readFileSync(dbPath, 'utf8')
-    return JSON.parse(content)
+    return JSON.parse(content) as Record<string, AnyRecord[]>
   } catch (err) {
     console.error('Error reading mock DB:', err)
     return {}
   }
 }
 
-function writeDB(data: Record<string, any[]>) {
+function writeDB(data: Record<string, AnyRecord[]>) {
   try {
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf8')
   } catch (err) {
@@ -55,7 +60,7 @@ function generateUUID(): string {
 }
 
 // Enrich relations based on the table name
-function enrichRecord(table: string, record: any, db: Record<string, any[]>): any {
+function enrichRecord(table: string, record: AnyRecord, db: Record<string, AnyRecord[]>): AnyRecord {
   if (!record) return record
   const enriched = { ...record }
 
@@ -78,6 +83,13 @@ function enrichRecord(table: string, record: any, db: Record<string, any[]>): an
 
     const contact = db['contacts']?.find((c) => c.id === record.contact_id)
     enriched.contact = contact || null
+
+    if (record.order_id) {
+      const order = db['orders']?.find((o) => o.id === record.order_id)
+      enriched.order = order ? enrichRecord('orders', order, db) : null
+    } else {
+      enriched.order = null
+    }
   }
 
   if (table === 'automation_logs') {
@@ -98,7 +110,7 @@ function enrichRecord(table: string, record: any, db: Record<string, any[]>): an
     enriched.contact = contact || null
 
     if (Array.isArray(record.items)) {
-      enriched.items = record.items.map((item: any) => {
+      enriched.items = record.items.map((item: AnyRecord) => {
         const product = db['products']?.find((p) => p.id === item.product_id)
         return {
           ...item,
@@ -111,7 +123,12 @@ function enrichRecord(table: string, record: any, db: Record<string, any[]>): an
   return enriched
 }
 
-export async function executeQuery(req: QueryRequest) {
+export async function executeQuery(req: QueryRequest): Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any
+  error: { message: string } | null
+  count: number
+}> {
   const db = readDB()
   const table = req.tableName
 
@@ -230,7 +247,7 @@ export async function executeQuery(req: QueryRequest) {
 
   if (req.action === 'update') {
     // Determine which rows to update based on filters
-    let rowsToUpdateIndices: number[] = []
+    const rowsToUpdateIndices: number[] = []
     db[table].forEach((item, index) => {
       let matches = true
       if (req.filters && req.filters.length > 0) {
@@ -263,8 +280,8 @@ export async function executeQuery(req: QueryRequest) {
   }
 
   if (req.action === 'delete') {
-    let rowsToKeep: any[] = []
-    let deletedRows: any[] = []
+    const rowsToKeep: AnyRecord[] = []
+    const deletedRows: AnyRecord[] = []
 
     db[table].forEach((item) => {
       let matches = true

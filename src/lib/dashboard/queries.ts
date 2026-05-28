@@ -12,6 +12,7 @@ import type {
   ActivityItem,
   ConversationsSeriesPoint,
   MetricsBundle,
+  PeriodType,
   PipelineDonutData,
   PipelineStageSlice,
   ResponseTimeBucket,
@@ -30,50 +31,95 @@ type DB = SupabaseClient
 
 // --- 1. Metric cards ---------------------------------------------------
 
-export async function loadMetrics(db: DB): Promise<MetricsBundle> {
-  const todayStart = startOfLocalDay().toISOString()
-  const yesterdayStart = daysAgoStart(1).toISOString()
+export async function loadMetrics(
+  db: DB,
+  period: PeriodType | 'custom' = 'day',
+  customStart?: Date,
+  customEnd?: Date,
+): Promise<MetricsBundle> {
+  const now = new Date()
+  let currentStart: Date
+  let currentEnd: Date = now
+  let previousStart: Date
+  let previousEnd: Date
+
+  if (period === 'custom' && customStart && customEnd) {
+    currentStart = startOfLocalDay(customStart)
+    currentEnd = new Date(customEnd)
+    currentEnd.setHours(23, 59, 59, 999)
+
+    const durationMs = currentEnd.getTime() - currentStart.getTime()
+    previousEnd = new Date(currentStart)
+    previousStart = new Date(currentStart.getTime() - durationMs)
+  } else if (period === 'week') {
+    const dow = mondayIndex(now)
+    currentStart = daysAgoStart(dow)
+    previousStart = daysAgoStart(dow + 7)
+    previousEnd = currentStart
+  } else if (period === 'month') {
+    currentStart = startOfLocalDay()
+    currentStart.setDate(1)
+    previousStart = new Date(currentStart)
+    previousStart.setMonth(previousStart.getMonth() - 1)
+    previousEnd = currentStart
+  } else {
+    // day
+    currentStart = startOfLocalDay()
+    previousStart = daysAgoStart(1)
+    previousEnd = currentStart
+  }
+
+  const curStartStr = currentStart.toISOString()
+  const curEndStr = currentEnd.toISOString()
+  const prevStartStr = previousStart.toISOString()
+  const prevEndStr = previousEnd.toISOString()
 
   const [
     openConvCur,
-    newConvToday,
-    newConvYesterday,
-    newContactsToday,
-    newContactsYesterday,
+    newConvCurPeriod,
+    newConvPrevPeriod,
+    newContactsCurPeriod,
+    newContactsPrevPeriod,
     openDeals,
-    messagesToday,
-    messagesYesterday,
+    messagesCurPeriod,
+    messagesPrevPeriod,
   ] = await Promise.all([
     db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     db
       .from('conversations')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'open')
-      .gte('created_at', todayStart),
+      .gte('created_at', curStartStr)
+      .lte('created_at', curEndStr),
     db
       .from('conversations')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'open')
-      .gte('created_at', yesterdayStart)
-      .lt('created_at', todayStart),
-    db.from('contacts').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
+      .gte('created_at', prevStartStr)
+      .lt('created_at', prevEndStr),
     db
       .from('contacts')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', yesterdayStart)
-      .lt('created_at', todayStart),
+      .gte('created_at', curStartStr)
+      .lte('created_at', curEndStr),
+    db
+      .from('contacts')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', prevStartStr)
+      .lt('created_at', prevEndStr),
     db.from('deals').select('value, status, currency').eq('status', 'open'),
     db
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('sender_type', 'agent')
-      .gte('created_at', todayStart),
+      .gte('created_at', curStartStr)
+      .lte('created_at', curEndStr),
     db
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('sender_type', 'agent')
-      .gte('created_at', yesterdayStart)
-      .lt('created_at', todayStart),
+      .gte('created_at', prevStartStr)
+      .lt('created_at', prevEndStr),
   ])
 
   const openDealsRows = (openDeals.data ?? []) as { value: number | null; currency?: string }[]
@@ -82,20 +128,17 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
   return {
     activeConversations: {
       current: openConvCur.count ?? 0,
-      // "vs yesterday" on a current-state count has no clean answer
-      // without snapshots — we show the delta in NEW open conversations
-      // today vs yesterday. That's the business-meaningful daily signal.
-      previous: (newConvToday.count ?? 0) - (newConvYesterday.count ?? 0),
+      previous: (newConvCurPeriod.count ?? 0) - (newConvPrevPeriod.count ?? 0),
     },
     newContactsToday: {
-      current: newContactsToday.count ?? 0,
-      previous: newContactsYesterday.count ?? 0,
+      current: newContactsCurPeriod.count ?? 0,
+      previous: newContactsPrevPeriod.count ?? 0,
     },
     openDealsValue,
     openDealsCount: openDealsRows.length,
     messagesSentToday: {
-      current: messagesToday.count ?? 0,
-      previous: messagesYesterday.count ?? 0,
+      current: messagesCurPeriod.count ?? 0,
+      previous: messagesPrevPeriod.count ?? 0,
     },
   }
 }
@@ -104,17 +147,42 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
 
 export async function loadConversationsSeries(
   db: DB,
-  rangeDays: number,
+  rangeOrDates: number | { start: Date; end: Date },
 ): Promise<ConversationsSeriesPoint[]> {
-  const start = daysAgoStart(rangeDays - 1).toISOString()
+  let start: Date
+  let end: Date
+  let days: number
+
+  if (typeof rangeOrDates === 'number') {
+    start = daysAgoStart(rangeOrDates - 1)
+    end = new Date()
+    days = rangeOrDates
+  } else {
+    start = startOfLocalDay(rangeOrDates.start)
+    end = new Date(rangeOrDates.end)
+    end.setHours(23, 59, 59, 999)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  const startIso = start.toISOString()
+  const endIso = end.toISOString()
+
   const { data, error } = await db
     .from('messages')
     .select('created_at, sender_type')
-    .gte('created_at', start)
+    .gte('created_at', startIso)
+    .lte('created_at', endIso)
     .order('created_at', { ascending: true })
   if (error) throw error
 
-  const keys = lastNDayKeys(rangeDays)
+  const keys: string[] = []
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start)
+    d.setDate(d.getDate() + i)
+    keys.push(localDayKey(d))
+  }
+
   const buckets = new Map<string, { incoming: number; outgoing: number }>()
   for (const k of keys) buckets.set(k, { incoming: 0, outgoing: 0 })
 
@@ -123,7 +191,7 @@ export async function loadConversationsSeries(
     const bucket = buckets.get(key)
     if (!bucket) continue
     if (row.sender_type === 'customer') bucket.incoming += 1
-    else bucket.outgoing += 1 // agent + bot both count as outgoing
+    else bucket.outgoing += 1
   }
 
   return keys.map((day) => ({ day, ...(buckets.get(day) ?? { incoming: 0, outgoing: 0 }) }))

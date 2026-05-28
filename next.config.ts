@@ -92,16 +92,23 @@ const nextConfig: NextConfig = {
    * matched.
    */
   async headers() {
+    const staticCacheRule =
+      process.env.NODE_ENV === "production"
+        ? [
+            {
+              source: "/_next/static/:path*",
+              headers: [
+                {
+                  key: "Cache-Control",
+                  value: "public, max-age=31536000, immutable",
+                },
+              ],
+            },
+          ]
+        : [];
+
     return [
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
+      ...staticCacheRule,
       {
         source: "/api/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],

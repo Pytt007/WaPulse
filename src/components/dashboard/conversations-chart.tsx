@@ -11,11 +11,11 @@ import { useTranslation } from '@/hooks/use-translation'
 type RangeDays = 7 | 30 | 90
 
 interface ConversationsChartProps {
-  /** Per-range data, so switching tabs never re-fetches. */
-  series: Record<RangeDays, ConversationsSeriesPoint[] | null>
+  /** Per-range data, or direct points array if custom. */
+  series: Record<RangeDays, ConversationsSeriesPoint[] | null> | ConversationsSeriesPoint[] | null
   loading: boolean
-  range: RangeDays
-  onRangeChange: (r: RangeDays) => void
+  range: RangeDays | 'custom'
+  onRangeChange?: (r: RangeDays) => void
 }
 
 // ------------------------------------------------------------
@@ -29,7 +29,7 @@ const VB_H = 240
 const PADDING = { top: 16, right: 16, bottom: 28, left: 40 }
 
 export function ConversationsChart({ series, loading, range, onRangeChange }: ConversationsChartProps) {
-  const data = series[range]
+  const data = Array.isArray(series) ? series : series ? (series[range as RangeDays] ?? null) : null
   const { t, language } = useTranslation()
 
   // Memoise the max so per-day hover math doesn't recompute it.
@@ -54,23 +54,25 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
           <h2 className="text-sm font-semibold text-white">{t("Conversations Over Time")}</h2>
           <p className="mt-0.5 text-xs text-slate-500">{t("Daily message volume by direction")}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg bg-slate-800/60 p-1">
-          {[7, 30, 90].map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => onRangeChange(r as RangeDays)}
-              className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                range === r
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-white',
-              )}
-            >
-              {r} {t("days")}
-            </button>
-          ))}
-        </div>
+        {range !== 'custom' && onRangeChange && (
+          <div className="flex items-center gap-1 rounded-lg bg-slate-800/60 p-1">
+            {[7, 30, 90].map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => onRangeChange(r as RangeDays)}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  range === r
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-400 hover:text-white',
+                )}
+              >
+                {r} {t("days")}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className="p-5">

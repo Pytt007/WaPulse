@@ -286,5 +286,145 @@ describe("Webhook AI Integration (Hybrid Shared Inbox)", () => {
     expect(orderMsg.content_text).toContain("Nouvelle commande panier");
     expect(orderMsg.content_text).toContain("TEST-SKU-ORDER");
     expect(orderMsg.content_text).toContain("*Total :* 300 EUR");
+
+    // Verify deal was created in pipeline
+    const finalDeals = await executeQuery({ action: "select", tableName: "deals" });
+    const createdDeal = finalDeals.data.find(
+      (d: any) => d.contact_id === "c-1" && d.value === 300
+    );
+    expect(createdDeal).toBeDefined();
+    expect(createdDeal.pipeline_id).toBe("p-1");
+    expect(createdDeal.stage_id).toBe("s-1");
+    expect(createdDeal.title).toBe("Commande - Alice Martin");
+  });
+
+  it("automatically creates a deal when a new contact sends their first message", async () => {
+    const textPayload = {
+      entry: [
+        {
+          id: "entry-newcontact-1",
+          changes: [
+            {
+              value: {
+                messaging_product: "whatsapp",
+                metadata: {
+                  display_phone_number: "+33612345678",
+                  phone_number_id: "phone-123456",
+                },
+                contacts: [
+                  {
+                    profile: { name: "Bernard Durand" },
+                    wa_id: "+33699991111",
+                  },
+                ],
+                messages: [
+                  {
+                    id: "meta-msg-newcontact-999",
+                    from: "+33699991111",
+                    timestamp: Math.floor(Date.now() / 1000).toString(),
+                    type: "text",
+                    text: { body: "Bonjour, je suis intéressé." }
+                  },
+                ],
+              },
+              field: "messages",
+            },
+          ],
+        },
+      ],
+    };
+
+    const req = new Request("http://localhost:3000/api/whatsapp/webhook", {
+      method: "POST",
+      headers: {
+        "x-hub-signature-256": "sha256=mock",
+      },
+      body: JSON.stringify(textPayload),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Wait for the async webhook processing
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Verify contact was created
+    const finalContacts = await executeQuery({ action: "select", tableName: "contacts" });
+    const createdContact = finalContacts.data.find(
+      (c: any) => c.phone === "+33699991111"
+    );
+    expect(createdContact).toBeDefined();
+    expect(createdContact.name).toBe("Bernard Durand");
+
+    // Verify deal was created in pipeline for the new contact
+    const finalDeals = await executeQuery({ action: "select", tableName: "deals" });
+    const createdDeal = finalDeals.data.find(
+      (d: any) => d.contact_id === createdContact.id
+    );
+    expect(createdDeal).toBeDefined();
+    expect(createdDeal.value).toBe(0);
+    expect(createdDeal.title).toBe("Opportunité - Bernard Durand");
+    expect(createdDeal.pipeline_id).toBe("p-1");
+    expect(createdDeal.stage_id).toBe("s-1");
+  });
+
+  it("does NOT create a deal when an existing contact sends a standard text message", async () => {
+    // Count deals before
+    const initialDeals = await executeQuery({ action: "select", tableName: "deals" });
+    const initialDealsCountForAlice = initialDeals.data.filter((d: any) => d.contact_id === "c-1").length;
+
+    const textPayload = {
+      entry: [
+        {
+          id: "entry-existingcontact-1",
+          changes: [
+            {
+              value: {
+                messaging_product: "whatsapp",
+                metadata: {
+                  display_phone_number: "+33612345678",
+                  phone_number_id: "phone-123456",
+                },
+                contacts: [
+                  {
+                    profile: { name: "Alice Martin" },
+                    wa_id: "+33612345678",
+                  },
+                ],
+                messages: [
+                  {
+                    id: "meta-msg-existingcontact-999",
+                    from: "+33612345678",
+                    timestamp: Math.floor(Date.now() / 1000).toString(),
+                    type: "text",
+                    text: { body: "Je voulais juste poser une autre question." }
+                  },
+                ],
+              },
+              field: "messages",
+            },
+          ],
+        },
+      ],
+    };
+
+    const req = new Request("http://localhost:3000/api/whatsapp/webhook", {
+      method: "POST",
+      headers: {
+        "x-hub-signature-256": "sha256=mock",
+      },
+      body: JSON.stringify(textPayload),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    // Wait for the async webhook processing
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Verify NO new deal was created for Alice
+    const finalDeals = await executeQuery({ action: "select", tableName: "deals" });
+    const finalDealsCountForAlice = finalDeals.data.filter((d: any) => d.contact_id === "c-1").length;
+    expect(finalDealsCountForAlice).toBe(initialDealsCountForAlice);
   });
 });

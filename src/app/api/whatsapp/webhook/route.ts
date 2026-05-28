@@ -637,9 +637,101 @@ async function processMessage(
         console.error('[webhook] Error auto-creating order:', orderInsertErr)
       } else {
         console.log(`[webhook] Order automatically created for contact ${contactRecord.id} with total ${totalAmount} ${orderCurrency}`)
+        
+        // 2b. Automatically create a CRM deal for this order in the first stage of the first pipeline
+        try {
+          const { data: firstPipeline } = await supabaseAdmin()
+            .from('pipelines')
+            .select('id')
+            .eq('user_id', userId)
+            .order('created_at')
+            .limit(1)
+            .maybeSingle()
+
+          if (firstPipeline) {
+            const { data: firstStage } = await supabaseAdmin()
+              .from('pipeline_stages')
+              .select('id')
+              .eq('pipeline_id', firstPipeline.id)
+              .order('position')
+              .limit(1)
+              .maybeSingle()
+
+            if (firstStage) {
+              const dealTitle = `Commande - ${contactRecord.name || contactRecord.phone}`
+              const { error: dealInsertErr } = await supabaseAdmin()
+                .from('deals')
+                .insert({
+                  user_id: userId,
+                  pipeline_id: firstPipeline.id,
+                  stage_id: firstStage.id,
+                  contact_id: contactRecord.id,
+                  conversation_id: conversation.id,
+                  title: dealTitle,
+                  value: totalAmount,
+                  currency: orderCurrency,
+                  status: 'open',
+                })
+              if (dealInsertErr) {
+                console.error('[webhook] Error auto-creating deal for order:', dealInsertErr)
+              } else {
+                console.log(`[webhook] Deal automatically created for order of contact ${contactRecord.id}`)
+              }
+            }
+          }
+        } catch (dealErr) {
+          console.error('[webhook] Error fetching pipeline/stage for auto-deal:', dealErr)
+        }
       }
     } catch (err) {
       console.error('[webhook] Order creation failed:', err)
+    }
+  }
+
+  // Automatic Deal Creation for New Contacts (excluding order messages which are handled above)
+  if (message.type !== 'order' && contactOutcome.wasCreated) {
+    try {
+      const { data: firstPipeline } = await supabaseAdmin()
+        .from('pipelines')
+        .select('id')
+        .eq('user_id', userId)
+        .order('created_at')
+        .limit(1)
+        .maybeSingle()
+
+      if (firstPipeline) {
+        const { data: firstStage } = await supabaseAdmin()
+          .from('pipeline_stages')
+          .select('id')
+          .eq('pipeline_id', firstPipeline.id)
+          .order('position')
+          .limit(1)
+          .maybeSingle()
+
+        if (firstStage) {
+          const dealTitle = `Opportunité - ${contactRecord.name || contactRecord.phone}`
+          const { error: dealInsertErr } = await supabaseAdmin()
+            .from('deals')
+            .insert({
+              user_id: userId,
+              pipeline_id: firstPipeline.id,
+              stage_id: firstStage.id,
+              contact_id: contactRecord.id,
+              conversation_id: conversation.id,
+              title: dealTitle,
+              value: 0,
+              currency: 'XOF', // default baseline
+              status: 'open',
+            })
+          if (dealInsertErr) {
+            console.error('[webhook] Error auto-creating deal for new contact:', dealInsertErr)
+          } else {
+            console.log(`[webhook] Deal automatically created for new contact ${contactRecord.id}`)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[webhook] Deal creation for new contact failed:', err)
     }
   }
 

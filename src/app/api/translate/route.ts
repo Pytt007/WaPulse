@@ -12,6 +12,8 @@ const fallbackDictionary: Record<string, Record<string, string>> = {
     "settings": "Paramètres",
     "profile": "Profil",
     "sign out": "Se déconnecter",
+    "open": "Ouvert",
+    "closed": "Fermé",
     "active conversations": "Conversations actives",
     "new contacts today": "Nouveaux contacts aujourd'hui",
     "open deals value": "Valeur des opportunités ouvertes",

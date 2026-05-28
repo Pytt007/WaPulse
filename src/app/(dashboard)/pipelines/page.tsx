@@ -90,7 +90,7 @@ export default function PipelinesPage() {
     async (pipelineId: string) => {
       const { data } = await supabase
         .from("deals")
-        .select("*, contact:contacts(*), assignee:profiles!deals_assigned_to_fkey(*)")
+        .select("*, contact:contacts(*), assignee:profiles!deals_assigned_to_fkey(*), order:orders(*)")
         .eq("pipeline_id", pipelineId)
         .order("created_at", { ascending: false });
       return (data ?? []) as Deal[];
@@ -203,20 +203,45 @@ export default function PipelinesPage() {
 
   const handleDealMoved = useCallback(
     async (dealId: string, newStageId: string) => {
+      // Find the deal to check its current status
+      const movedDeal = deals.find((d) => d.id === dealId);
+      const isWonOrLost = movedDeal?.status === "won" || movedDeal?.status === "lost";
+      const newStatus = isWonOrLost ? "open" : (movedDeal?.status || "open");
+
       // Optimistic update — board already animated; just persist.
       setDeals((prev) =>
-        prev.map((d) => (d.id === dealId ? { ...d, stage_id: newStageId } : d)),
+        prev.map((d) =>
+          d.id === dealId
+            ? {
+                ...d,
+                stage_id: newStageId,
+                status: newStatus as any,
+                order_id: newStatus === "open" ? undefined : d.order_id,
+                order: newStatus === "open" ? undefined : d.order,
+              }
+            : d,
+        ),
       );
+
+      const updatePayload: any = { stage_id: newStageId };
+      if (isWonOrLost) {
+        updatePayload.status = "open";
+        updatePayload.order_id = null;
+      }
+
       const { error } = await supabase
         .from("deals")
-        .update({ stage_id: newStageId })
+        .update(updatePayload)
         .eq("id", dealId);
+
       if (error) {
         toast.error(t("Failed to move deal"));
         refreshDeals();
+      } else if (isWonOrLost) {
+        toast.success(t("Deal reopened"));
       }
     },
-    [supabase, refreshDeals],
+    [supabase, refreshDeals, deals, t],
   );
 
   const handleAddDeal = useCallback(
@@ -454,7 +479,7 @@ export default function PipelinesPage() {
         />
       )}
 
-      {/* Deal Form (Sheet) */}
+      {/* Deal Form (Dialog) */}
       <DealForm
         open={dealFormOpen}
         onOpenChange={setDealFormOpen}

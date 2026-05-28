@@ -1,3 +1,5 @@
+export type PeriodType = 'day' | 'week' | 'month'
+
 // Shared result shapes the dashboard components consume. Centralised
 // here so each component stays thin and the page-level loader wires
 // them up without type gymnastics.

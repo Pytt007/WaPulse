@@ -333,9 +333,8 @@ export function PipelineSettings({
 
             <DialogFooter className="border-slate-700 bg-slate-900/50">
               <Button
-                variant="destructive"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="mr-auto bg-red-600 hover:bg-red-700"
+                className="mr-auto bg-red-600 text-white hover:bg-red-700"
               >
                 Delete Pipeline
               </Button>

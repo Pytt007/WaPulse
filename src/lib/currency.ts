@@ -1,17 +1,16 @@
-export type Currency = "XOF" | "USD" | "EUR" | "GBP";
+export type Currency = "XOF" | "USD" | "EUR";
 
-export const SUPPORTED_CURRENCIES: Currency[] = ["XOF", "USD", "EUR", "GBP"];
+export const SUPPORTED_CURRENCIES: Currency[] = ["XOF", "USD", "EUR"];
 
 export const EXCHANGE_RATES: Record<Currency, number> = {
   XOF: 1,
   USD: 600,
   EUR: 655.957,
-  GBP: 760,
 };
 
 /**
  * Converts a monetary value from a source currency to a target currency.
- * Baseline currency is XOF (FCFA).
+ * Baseline currency is XOF.
  */
 export function convertCurrency(
   value: number,

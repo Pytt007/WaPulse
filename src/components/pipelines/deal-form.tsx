@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useCurrency } from "@/hooks/use-currency";
 import { createClient } from "@/lib/supabase/client";
 import type {
   Contact,
@@ -10,13 +11,14 @@ import type {
   DealStatus,
   PipelineStage,
   Profile,
+  Product,
 } from "@/types";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +29,7 @@ import {
   Trash2,
   MessageSquare,
   Loader2,
+  ShoppingCart,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,10 +53,11 @@ export function DealForm({
   onSaved,
 }: DealFormProps) {
   const supabase = createClient();
+  const { currency: globalCurrency } = useCurrency();
 
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
-  const [currency, setCurrency] = useState("XOF");
+  const [currency, setCurrency] = useState(globalCurrency);
   const [contactId, setContactId] = useState("");
   const [stageId, setStageId] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
@@ -70,6 +74,14 @@ export function DealForm({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // States for order link / creation
+  const [showOrderPanel, setShowOrderPanel] = useState(false);
+  const [createOrderLoading, setCreateOrderLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [orderPaymentMethod, setOrderPaymentMethod] = useState<string>("card");
+  const [orderStatus, setOrderStatus] = useState<"pending" | "paid" | "shipped">("pending");
+
   // Reset the form fields every time the sheet opens or its input
   // props change. This is a legitimate prop-driven sync; the rule is
   // over-cautious here, hence the block-level disable.
@@ -77,10 +89,14 @@ export function DealForm({
   useEffect(() => {
     if (!open) return;
     setConfirmDelete(false);
+    setShowOrderPanel(false);
+    setSelectedProductId("");
+    setOrderPaymentMethod("card");
+    setOrderStatus("pending");
     if (deal) {
       setTitle(deal.title);
       setValue(String(deal.value ?? ""));
-      setCurrency(deal.currency || "XOF");
+      setCurrency((deal.currency || globalCurrency) as any);
       // contact_id is nullable when the contact has been deleted
       // (migration 004: ON DELETE SET NULL). "" means "no selection".
       setContactId(deal.contact_id ?? "");
@@ -91,14 +107,14 @@ export function DealForm({
     } else {
       setTitle("");
       setValue("");
-      setCurrency("XOF");
+      setCurrency(globalCurrency);
       setContactId("");
       setStageId(defaultStageId || stages[0]?.id || "");
       setAssignedTo("");
       setExpectedCloseDate("");
       setNotes("");
     }
-  }, [open, deal, defaultStageId, stages]);
+  }, [open, deal, defaultStageId, stages, globalCurrency]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Load supporting data once the sheet is open
@@ -106,13 +122,15 @@ export function DealForm({
     if (!open) return;
     let cancelled = false;
     (async () => {
-      const [c, p] = await Promise.all([
+      const [c, p, prod] = await Promise.all([
         supabase.from("contacts").select("*").order("name"),
         supabase.from("profiles").select("*").order("full_name"),
+        supabase.from("products").select("*").eq("active", true).order("name"),
       ]);
       if (cancelled) return;
       setContacts((c.data ?? []) as Contact[]);
       setProfiles((p.data ?? []) as Profile[]);
+      setProducts((prod.data ?? []) as Product[]);
     })();
     return () => {
       cancelled = true;
@@ -203,9 +221,13 @@ export function DealForm({
   async function handleStatusChange(status: DealStatus) {
     if (!deal) return;
     setStatusAction(status);
+    const updatePayload: any = { status };
+    if (status === "open" || status === "lost") {
+      updatePayload.order_id = null;
+    }
     const { error } = await supabase
       .from("deals")
-      .update({ status })
+      .update(updatePayload)
       .eq("id", deal.id);
     setStatusAction(null);
     if (error) {
@@ -217,6 +239,77 @@ export function DealForm({
     );
     onOpenChange(false);
     onSaved();
+  }
+
+  async function handleMarkAsWonWithOrder() {
+    if (!deal) return;
+    setCreateOrderLoading(true);
+
+    try {
+      const selectedProduct = selectedProductId
+        ? products.find((p) => p.id === selectedProductId)
+        : null;
+
+      const qty = selectedProduct
+        ? Math.max(1, Math.round(deal.value / (selectedProduct.price || 1)))
+        : 1;
+
+      const totalAmount = selectedProduct
+        ? (selectedProduct.price || 0) * qty
+        : deal.value;
+
+      const orderPayload = {
+        user_id: deal.user_id,
+        contact_id: deal.contact_id,
+        total_amount: totalAmount,
+        currency: deal.currency || "XOF",
+        status: orderStatus,
+        payment_method: orderPaymentMethod,
+        items: [
+          selectedProduct
+            ? {
+                product_id: selectedProductId,
+                quantity: qty,
+                price: selectedProduct.price,
+              }
+            : {
+                name: `Opportunité: ${deal.title}`,
+                quantity: 1,
+                price: deal.value,
+                product_id: null,
+              },
+        ],
+      };
+
+      const { data: newOrder, error: orderError } = await supabase
+        .from("orders")
+        .insert(orderPayload)
+        .select()
+        .single();
+
+      if (orderError) {
+        throw orderError;
+      }
+
+      const { error: dealError } = await supabase
+        .from("deals")
+        .update({ status: "won", order_id: newOrder.id })
+        .eq("id", deal.id);
+
+      if (dealError) {
+        throw dealError;
+      }
+
+      toast.success("Deal gagné et commande créée !");
+      setShowOrderPanel(false);
+      onOpenChange(false);
+      onSaved();
+    } catch (error: any) {
+      console.error("Error linking deal to order:", error);
+      toast.error("Erreur lors de la création de la commande.");
+    } finally {
+      setCreateOrderLoading(false);
+    }
   }
 
   async function handleDelete() {
@@ -235,19 +328,17 @@ export function DealForm({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-lg w-full p-0"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-lg w-full p-0 overflow-hidden flex flex-col max-h-[85vh]"
       >
-        <div className="flex h-full flex-col">
-          <SheetHeader className="border-b border-slate-700/50 p-4">
-            <SheetTitle className="text-white">
-              {deal ? "Edit Deal" : "New Deal"}
-            </SheetTitle>
-          </SheetHeader>
+        <DialogHeader className="border-b border-slate-700/50 p-4 shrink-0">
+          <DialogTitle className="text-white">
+            {deal ? "Edit Deal" : "New Deal"}
+          </DialogTitle>
+        </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[calc(85vh-180px)]">
             <div className="grid gap-2">
               <Label className="text-slate-300">Title</Label>
               <Input
@@ -289,7 +380,7 @@ export function DealForm({
                 <Label className="text-slate-300">Value</Label>
                 <div className="relative flex items-center">
                   <span className="absolute left-3 text-slate-500 text-xs font-semibold pointer-events-none select-none">
-                    {currency === "XOF" ? "CFA" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "$"}
+                    {currency === "XOF" ? "XOF" : currency === "EUR" ? "€" : "$"}
                   </span>
                   <Input
                     type="number"
@@ -302,16 +393,11 @@ export function DealForm({
               </div>
               <div className="grid gap-2">
                 <Label className="text-slate-300">Currency</Label>
-                <select
+                <Input
                   value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-sm text-white outline-none focus:border-violet-500"
-                >
-                  <option value="XOF">XOF (FCFA)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                </select>
+                  disabled
+                  className="border-slate-700 bg-slate-800/50 text-slate-400 focus-visible:ring-0"
+                />
               </div>
             </div>
 
@@ -368,42 +454,135 @@ export function DealForm({
 
             {deal && (
               <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Status
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => handleStatusChange("won")}
-                    disabled={!!statusAction || deal.status === "won"}
-                    className="flex-1 bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
-                  >
-                    {statusAction === "won" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Check className="mr-1 h-4 w-4" />
-                        Mark as Won
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => handleStatusChange("lost")}
-                    disabled={!!statusAction || deal.status === "lost"}
-                    className="flex-1 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                  >
-                    {statusAction === "lost" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <X className="mr-1 h-4 w-4" />
-                        Mark as Lost
-                      </>
-                    )}
-                  </Button>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    Status
+                  </p>
+                  {deal.order_id && (
+                    <Link
+                      href="/dashboard/orders"
+                      className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 hover:underline"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" /> Voir la commande liée
+                    </Link>
+                  )}
                 </div>
-                {deal.status && deal.status !== "open" && (
+                
+                {deal.status === "won" && deal.order_id ? (
+                  <div className="text-sm font-semibold text-emerald-400 flex items-center gap-1 py-1">
+                    <Check className="h-4 w-4" /> Gagné (Commande liée)
+                  </div>
+                ) : showOrderPanel ? (
+                  <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700/60 space-y-3 mt-2">
+                    <p className="text-xs font-semibold text-white">Générer une commande liée ?</p>
+                    
+                    <div className="grid gap-1">
+                      <Label className="text-[10px] text-slate-300">Produit (Optionnel)</Label>
+                      <select
+                        value={selectedProductId}
+                        onChange={(e) => setSelectedProductId(e.target.value)}
+                        className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-white outline-none"
+                      >
+                        <option value="">-- Article générique (valeur du deal) --</option>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.price} {p.currency})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="grid gap-0.5">
+                        <Label className="text-[10px] text-slate-300">Moyen Paiement</Label>
+                        <select
+                          value={orderPaymentMethod}
+                          onChange={(e) => setOrderPaymentMethod(e.target.value)}
+                          className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-white outline-none"
+                        >
+                          <option value="card">Carte</option>
+                          <option value="mobile_money">Mobile Money</option>
+                          <option value="cash">Espèces</option>
+                        </select>
+                      </div>
+                      
+                      <div className="grid gap-0.5">
+                        <Label className="text-[10px] text-slate-300">Statut initial</Label>
+                        <select
+                          value={orderStatus}
+                          onChange={(e) => setOrderStatus(e.target.value as any)}
+                          className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-white outline-none"
+                        >
+                          <option value="pending">En Attente</option>
+                          <option value="paid">Payée</option>
+                          <option value="shipped">Expédiée</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        type="button"
+                        onClick={handleMarkAsWonWithOrder}
+                        disabled={createOrderLoading}
+                        className="flex-1 h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                      >
+                        {createOrderLoading ? "Création..." : "Créer commande"}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => handleStatusChange("won")}
+                        disabled={createOrderLoading}
+                        className="flex-1 h-7 text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-200"
+                      >
+                        Seulement Won
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowOrderPanel(false)}
+                      disabled={createOrderLoading}
+                      className="w-full h-6 text-[10px] text-slate-400 hover:text-white"
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => setShowOrderPanel(true)}
+                      disabled={!!statusAction || deal.status === "won"}
+                      className="flex-1 bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
+                    >
+                      {statusAction === "won" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Check className="mr-1 h-4 w-4" />
+                          Mark as Won
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => handleStatusChange("lost")}
+                      disabled={!!statusAction || deal.status === "lost"}
+                      className="flex-1 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {statusAction === "lost" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <X className="mr-1 h-4 w-4" />
+                          Mark as Lost
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+                {deal.status && deal.status !== "open" && !showOrderPanel && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -418,7 +597,7 @@ export function DealForm({
             )}
           </div>
 
-          <div className="border-t border-slate-700/50 bg-slate-900/80 p-4">
+          <div className="border-t border-slate-700/50 bg-slate-900/80 p-4 shrink-0">
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -470,8 +649,7 @@ export function DealForm({
                 </button>
               ))}
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

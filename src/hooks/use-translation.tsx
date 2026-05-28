@@ -23,10 +23,16 @@ const localTranslations: Record<Language, Record<string, string>> = {
     "settings": "Paramètres",
     "profile": "Profil",
     "sign out": "Se déconnecter",
+    "open": "Ouvert",
+    "closed": "Fermé",
     "active conversations": "Conversations actives",
     "new contacts today": "Nouveaux contacts aujourd'hui",
+    "new contacts this week": "Nouveaux contacts cette semaine",
+    "new contacts this month": "Nouveaux contacts ce mois-ci",
     "open deals value": "Valeur des opportunités ouvertes",
     "messages sent today": "Messages envoyés aujourd'hui",
+    "messages sent this week": "Messages envoyés cette semaine",
+    "messages sent this month": "Messages envoyés ce mois-ci",
     "live analytics across conversations, contacts, deals, broadcasts, and automations.": "Analyses en temps réel des conversations, contacts, opportunités, diffusions et automatisations.",
     "quick actions": "Actions rapides",
     "conversations chart": "Graphique des conversations",
@@ -35,7 +41,15 @@ const localTranslations: Record<Language, Record<string, string>> = {
     "product catalog": "Catalogue de produits",
     "order tracking": "Suivi des commandes",
     "new today vs yesterday": "nouveaux aujourd'hui vs hier",
+    "new this week vs last week": "nouveaux cette semaine vs la semaine dernière",
+    "new this month vs last month": "nouveaux ce mois-ci vs le mois dernier",
     "vs yesterday": "vs hier",
+    "vs last week": "vs la semaine dernière",
+    "vs last month": "vs le mois dernier",
+    "période :": "Période :",
+    "jour": "Jour",
+    "semaine": "Semaine",
+    "mois": "Mois",
     "open deal": "opportunité ouverte",
     "open deals": "opportunités ouvertes",
     "no change": "aucun changement",
@@ -385,7 +399,31 @@ const localTranslations: Record<Language, Record<string, string>> = {
     "thu": "Jeu",
     "fri": "Ven",
     "sat": "Sam",
-    "sun": "Dim"
+    "sun": "Dim",
+
+    // Inbox thread header
+    "contact info": "Infos contact",
+    "select a conversation": "Sélectionner une conversation",
+    "choose a conversation from the left to start messaging": "Choisissez une conversation à gauche pour commencer",
+    "no messages yet": "Aucun message pour le moment",
+    "send a template to start the conversation": "Envoyez un modèle pour démarrer la conversation",
+    "you": "Vous",
+    "expired": "Expiré",
+    "remaining": "restant",
+    "assign": "Assigner",
+    "assigned": "Assigné",
+    "unassign": "Désassigner",
+    "me": "moi",
+    "no teammates available": "Aucun coéquipier disponible",
+    "wait for the message to finish sending": "Attendez que le message finisse d'être envoyé",
+    "reaction failed": "Réaction échouée",
+    "failed to update assignment": "Échec de la mise à jour de l'assignation",
+    "failed to update ai status": "Échec de la mise à jour du statut IA",
+    "ai agent has been paused": "L'agent IA a été mis en pause",
+    "ai agent is now active": "L'agent IA est maintenant actif",
+    "share a contact": "Partager un contact",
+    "search a contact...": "Rechercher un contact...",
+    "no contacts found": "Aucun contact trouvé",
   },
   en: {
     "tableau de bord": "Dashboard",
@@ -501,7 +539,31 @@ const localTranslations: Record<Language, Record<string, string>> = {
     "thu": "Thu",
     "fri": "Fri",
     "sat": "Sat",
-    "sun": "Sun"
+    "sun": "Sun",
+
+    // Inbox thread header (English passthrough)
+    "contact info": "Contact info",
+    "select a conversation": "Select a conversation",
+    "choose a conversation from the left to start messaging": "Choose a conversation from the left to start messaging",
+    "no messages yet": "No messages yet",
+    "send a template to start the conversation": "Send a template to start the conversation",
+    "you": "You",
+    "expired": "Expired",
+    "remaining": "remaining",
+    "assign": "Assign",
+    "assigned": "Assigned",
+    "unassign": "Unassign",
+    "me": "me",
+    "no teammates available": "No teammates available",
+    "wait for the message to finish sending": "Wait for the message to finish sending",
+    "reaction failed": "Reaction failed",
+    "failed to update assignment": "Failed to update assignment",
+    "failed to update ai status": "Failed to update AI status",
+    "ai agent has been paused": "AI agent has been paused",
+    "ai agent is now active": "AI agent is now active",
+    "share a contact": "Share a contact",
+    "search a contact...": "Search a contact...",
+    "no contacts found": "No contacts found",
   }
 };
 
@@ -519,6 +581,7 @@ function matchCasing(original: string, translation: string): string {
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [cache, setCache] = useState<Record<Language, Record<string, string>>>({ fr: {}, en: {} });
   const [language, setLanguageState] = useState<Language>("fr");
+  const [mounted, setMounted] = useState(false);
   const pendingRequests = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -539,6 +602,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           console.error("Failed to parse translation cache:", e);
         }
       }
+
+      setMounted(true);
     }
   }, []);
 
@@ -595,23 +660,28 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const cleanText = text.trim();
     const normalized = cleanText.toLowerCase();
 
+    // Before mount (SSR / first render), always use 'fr' to match server output
+    const activeLang: Language = mounted ? language : "fr";
+
     // Check if translation is locally hardcoded
-    const localTrans = localTranslations[language]?.[normalized];
+    const localTrans = localTranslations[activeLang]?.[normalized];
     if (localTrans) {
       return matchCasing(cleanText, localTrans);
     }
 
     // Check localStorage cache
-    const cachedTrans = cache[language]?.[normalized];
+    const cachedTrans = cache[activeLang]?.[normalized];
     if (cachedTrans) {
       return matchCasing(cleanText, cachedTrans);
     }
 
-    // In background, fetch the translation
-    triggerBackgroundTranslation(cleanText, language);
+    // In background, fetch the translation (only after mount)
+    if (mounted) {
+      triggerBackgroundTranslation(cleanText, activeLang);
+    }
 
     return cleanText;
-  }, [language, cache, triggerBackgroundTranslation]);
+  }, [language, cache, mounted, triggerBackgroundTranslation]);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>

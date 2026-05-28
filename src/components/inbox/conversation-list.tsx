@@ -4,16 +4,9 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus } from "@/types";
-import { Search, ChevronDown, Bot } from "lucide-react";
+import { Search, Bot } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -24,11 +17,6 @@ interface ConversationListProps {
   onConversationsLoaded: (conversations: Conversation[]) => void;
 }
 
-const STATUS_COLORS: Record<ConversationStatus, string> = {
-  open: "bg-violet-500",
-  pending: "bg-amber-500",
-  closed: "bg-slate-500",
-};
 
 const FILTER_OPTIONS: { label: string; value: ConversationStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -45,7 +33,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<ConversationStatus | "all">("all");
+  const [filter, setFilter] = useState<ConversationStatus | "all">("open");
   const [loading, setLoading] = useState(true);
 
   // Keep the latest callback in a ref so the fetch effect below can
@@ -132,8 +120,6 @@ export function ConversationList({
     [onSelect]
   );
 
-  const activeFilter = FILTER_OPTIONS.find((o) => o.value === filter);
-
   return (
     // w-full on mobile so the list occupies the whole viewport when it's
     // the single pane showing; fixed 320px on desktop where it shares the
@@ -151,31 +137,31 @@ export function ConversationList({
           />
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center justify-center h-7 gap-1 px-2 text-xs text-slate-400 hover:text-white rounded-md hover:bg-slate-800">
-              {activeFilter ? t(activeFilter.label) : t("All")}
-              <ChevronDown className="h-3 w-3" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="border-slate-700 bg-slate-800"
-          >
-            {FILTER_OPTIONS.map((opt) => (
-              <DropdownMenuItem
+        <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-950/60 rounded-lg border border-slate-800">
+          {FILTER_OPTIONS.map((opt) => {
+            const isActive = filter === opt.value;
+            return (
+              <button
                 key={opt.value}
                 onClick={() => setFilter(opt.value)}
                 className={cn(
-                  "text-sm",
-                  filter === opt.value
-                    ? "text-violet-400"
-                    : "text-slate-300"
+                  "py-1.5 px-1 text-[11px] font-medium rounded-md transition-all text-center truncate border",
+                  isActive
+                    ? opt.value === "open"
+                      ? "bg-violet-500/10 text-violet-400 border-violet-500/20 shadow-sm"
+                      : opt.value === "pending"
+                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-sm"
+                        : opt.value === "closed"
+                          ? "bg-slate-500/10 text-slate-400 border-slate-700 shadow-sm"
+                          : "bg-slate-800 text-white border-slate-700/50 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border-transparent"
                 )}
               >
                 {t(opt.label)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Conversation Items */}
@@ -277,11 +263,16 @@ function ConversationItem({
             )}
             <span
               className={cn(
-                "h-2 w-2 rounded-full",
-                STATUS_COLORS[conversation.status]
+                "inline-flex items-center rounded px-1 py-0.5 text-[9px] font-semibold border uppercase tracking-wider",
+                conversation.status === "open"
+                  ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                  : conversation.status === "pending"
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                    : "bg-slate-500/10 text-slate-400 border-slate-700"
               )}
-              title={t(conversation.status)}
-            />
+            >
+              {t(conversation.status)}
+            </span>
           </div>
         </div>
       </div>

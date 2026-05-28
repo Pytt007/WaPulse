@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/hooks/use-translation";
-import { LogOut, Menu, Settings as SettingsIcon, User, Languages, Coins } from "lucide-react";
+import { LogOut, Menu, Settings as SettingsIcon, User, Languages, Coins, Sun, Moon } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
+import { useTheme } from "@/hooks/use-theme";
 import {
   Avatar,
   AvatarFallback,
@@ -51,6 +52,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const { profile, signOut } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const { currency, setCurrency } = useCurrency();
+  const { theme, toggleTheme, mounted } = useTheme();
   const title = t(getPageTitle(pathname));
 
   const initial =
@@ -76,6 +78,22 @@ export function Header({ onOpenSidebar }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Theme Toggle */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none cursor-pointer"
+          aria-label="Toggle theme"
+        >
+          {!mounted ? (
+            <div className="h-5 w-5" />
+          ) : theme === "dark" ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
+        </button>
+
         {/* Currency selector */}
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -96,7 +114,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
               onClick={() => setCurrency("XOF")}
               className={`text-slate-200 focus:bg-slate-800 focus:text-white cursor-pointer ${currency === "XOF" ? "bg-slate-800 text-white font-medium" : ""}`}
             >
-              FCFA (XOF)
+              XOF
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setCurrency("USD")}
@@ -109,12 +127,6 @@ export function Header({ onOpenSidebar }: HeaderProps) {
               className={`text-slate-200 focus:bg-slate-800 focus:text-white cursor-pointer ${currency === "EUR" ? "bg-slate-800 text-white font-medium" : ""}`}
             >
               Euro (EUR)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setCurrency("GBP")}
-              className={`text-slate-200 focus:bg-slate-800 focus:text-white cursor-pointer ${currency === "GBP" ? "bg-slate-800 text-white font-medium" : ""}`}
-            >
-              Livre (GBP)
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

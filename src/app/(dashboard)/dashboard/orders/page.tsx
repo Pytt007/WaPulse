@@ -20,6 +20,12 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Table,
   TableBody,
   TableCell,
@@ -38,6 +44,8 @@ import {
   RefreshCw,
   Trash2,
   Calendar,
+  Pencil,
+  ChevronDown,
 } from 'lucide-react'
 
 export default function OrdersPage() {
@@ -54,13 +62,14 @@ export default function OrdersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
-  // Selected Order for detail or delete
+  // Selected Order for detail, edit or delete
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
-  // Simulation form states
+  // Shared form states (create & edit)
   const [selectedContactId, setSelectedContactId] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('stripe')
+  const [paymentMethod, setPaymentMethod] = useState('card')
   const [orderStatus, setOrderStatus] = useState<'pending' | 'paid' | 'cancelled' | 'shipped'>('pending')
   const [orderItems, setOrderItems] = useState<{ product_id: string; quantity: number }[]>([
     { product_id: '', quantity: 1 },
@@ -104,7 +113,7 @@ export default function OrdersPage() {
 
   const handleOpenCreate = () => {
     if (contacts.length > 0) setSelectedContactId(contacts[0].id)
-    setPaymentMethod('stripe')
+    setPaymentMethod('card')
     setOrderStatus('pending')
     if (products.length > 0) {
       setOrderItems([{ product_id: products[0].id, quantity: 1 }])
@@ -122,6 +131,56 @@ export default function OrdersPage() {
   const handleOpenDelete = (order: Order) => {
     setSelectedOrder(order)
     setIsDeleteOpen(true)
+  }
+
+  const handleOpenEdit = (order: Order) => {
+    setSelectedOrder(order)
+    setSelectedContactId(order.contact_id)
+    setPaymentMethod(order.payment_method || 'card')
+    setOrderStatus(order.status)
+    // Rebuild items list from stored items
+    const items = (order.items || []).map((item: any) => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+    }))
+    setOrderItems(items.length > 0 ? items : [{ product_id: products[0]?.id || '', quantity: 1 }])
+    setIsEditOpen(true)
+  }
+
+  const handleUpdateOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedOrder || !selectedContactId || orderItems.some((item) => !item.product_id || item.quantity <= 0)) return
+
+    try {
+      let totalAmount = 0
+      const itemsPayload = orderItems.map((item) => {
+        const product = products.find((p) => p.id === item.product_id)
+        const price = product ? product.price : 0
+        totalAmount += price * item.quantity
+        return { product_id: item.product_id, quantity: item.quantity, price }
+      })
+
+      const firstSelectedProduct = products.find((p) => p.id === orderItems[0]?.product_id)
+      const orderCurrency = firstSelectedProduct?.currency || selectedOrder.currency || 'XOF'
+
+      const { error } = await db
+        .from('orders')
+        .update({
+          contact_id: selectedContactId,
+          total_amount: totalAmount,
+          currency: orderCurrency,
+          status: orderStatus,
+          payment_method: paymentMethod,
+          items: itemsPayload,
+        })
+        .eq('id', selectedOrder.id)
+
+      if (error) throw error
+      setIsEditOpen(false)
+      loadData()
+    } catch (err) {
+      console.error('Error updating order:', err)
+    }
   }
 
   const handleAddItem = () => {
@@ -188,6 +247,20 @@ export default function OrdersPage() {
       loadData()
     } catch (err) {
       console.error('Error deleting order:', err)
+    }
+  }
+
+  const handleUpdateStatus = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      const { error } = await db
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId)
+      if (error) throw error
+      setIsDetailsOpen(false)
+      loadData()
+    } catch (err) {
+      console.error('Error updating order status:', err)
     }
   }
 
@@ -427,20 +500,55 @@ export default function OrdersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-slate-400 capitalize">
-                        {order.payment_method === 'bank_transfer'
-                          ? t('Virement')
-                          : order.payment_method === 'stripe'
-                          ? t('Stripe / Carte')
+                        {order.payment_method === 'card'
+                          ? t('Carte')
+                          : order.payment_method === 'mobile_money'
+                          ? t('Mobile Money')
                           : order.payment_method === 'cash'
                           ? t('Espèces')
-                          : order.payment_method === 'link'
-                          ? t('Lien de paiement')
                           : order.payment_method}
                       </TableCell>
                       <TableCell className="font-semibold text-slate-200">
                         {format(order.total_amount, order.currency)}
                       </TableCell>
-                      <TableCell>{getStatusBadge(order.status)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="flex items-center gap-1 rounded-md hover:opacity-80 transition-opacity focus:outline-none">
+                            {getStatusBadge(order.status)}
+                            <ChevronDown className="h-3 w-3 text-slate-500" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="bg-slate-900 border-slate-700 min-w-[150px]">
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(order.id, 'pending')}
+                              className={`text-amber-400 focus:bg-slate-800 focus:text-amber-300 ${order.status === 'pending' ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
+                              <span className="mr-2 inline-block h-2 w-2 rounded-full bg-amber-400" />
+                              {t('En Attente')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(order.id, 'paid')}
+                              className={`text-emerald-400 focus:bg-slate-800 focus:text-emerald-300 ${order.status === 'paid' ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
+                              <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                              {t('Payée')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(order.id, 'shipped')}
+                              className={`text-blue-400 focus:bg-slate-800 focus:text-blue-300 ${order.status === 'shipped' ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
+                              <span className="mr-2 inline-block h-2 w-2 rounded-full bg-blue-400" />
+                              {t('Expédiée')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                              className={`text-red-400 focus:bg-slate-800 focus:text-red-300 ${order.status === 'cancelled' ? 'opacity-50 pointer-events-none' : ''}`}
+                            >
+                              <span className="mr-2 inline-block h-2 w-2 rounded-full bg-red-400" />
+                              {t('Annulée')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">
                           <Button
@@ -450,6 +558,14 @@ export default function OrdersPage() {
                             className="h-8 w-8 text-slate-400 hover:bg-slate-800 hover:text-white"
                           >
                             <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEdit(order)}
+                            className="h-8 w-8 text-violet-400 hover:bg-violet-950/30 hover:text-violet-300"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -523,10 +639,9 @@ export default function OrdersPage() {
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="flex h-9 w-full rounded-md border border-slate-800 bg-slate-955 px-3 py-1 text-sm shadow-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500"
                   >
-                    <option value="stripe">{t("Stripe / Carte")}</option>
-                    <option value="bank_transfer">{t("Virement Bancaire")}</option>
+                    <option value="card">{t("Carte")}</option>
+                    <option value="mobile_money">{t("Mobile Money")}</option>
                     <option value="cash">{t("Espèces")}</option>
-                    <option value="link">{t("Lien de paiement")}</option>
                   </select>
                 </div>
               </div>
@@ -619,7 +734,7 @@ export default function OrdersPage() {
 
       {/* DETAIL DIALOG */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md">
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">{t("Détails de la commande")}</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -659,7 +774,7 @@ export default function OrdersPage() {
                       {selectedOrder.items?.map((item, idx) => (
                         <TableRow key={idx} className="border-slate-800/40">
                           <TableCell className="py-2 text-xs text-slate-200">
-                            {item.product?.name || t('Produit Supprimé')}
+                            {item.product?.name || item.name || t('Produit Supprimé')}
                             {item.product?.sku && (
                               <span className="block font-mono text-[10px] text-slate-500">
                                 {item.product.sku}
@@ -699,14 +814,12 @@ export default function OrdersPage() {
                     {t("Paiement")}
                   </span>
                   <p className="text-xs font-medium text-slate-300 mt-1 capitalize">
-                    {selectedOrder.payment_method === 'bank_transfer'
-                      ? t('Virement Bancaire')
-                      : selectedOrder.payment_method === 'stripe'
-                      ? t('Stripe / Carte')
+                    {selectedOrder.payment_method === 'card'
+                      ? t('Carte')
+                      : selectedOrder.payment_method === 'mobile_money'
+                      ? t('Mobile Money')
                       : selectedOrder.payment_method === 'cash'
                       ? t('Espèces')
-                      : selectedOrder.payment_method === 'link'
-                      ? t('Lien de paiement')
                       : selectedOrder.payment_method}
                   </p>
                 </div>
@@ -714,14 +827,186 @@ export default function OrdersPage() {
             </div>
           )}
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex flex-col gap-2 sm:flex-col">
+            {selectedOrder && (
+              <div className="flex gap-2 w-full">
+                {selectedOrder.status === 'pending' && (
+                  <Button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'paid')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex-1"
+                  >
+                    {t("Marquer comme Payée")}
+                  </Button>
+                )}
+                {selectedOrder.status === 'paid' && (
+                  <Button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedOrder.id, 'shipped')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium flex-1"
+                  >
+                    {t("Marquer comme Expédiée")}
+                  </Button>
+                )}
+              </div>
+            )}
             <Button
+              type="button"
               onClick={() => setIsDetailsOpen(false)}
               className="bg-slate-800 hover:bg-slate-700 text-slate-200 w-full"
             >
               {t("Fermer")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* EDIT ORDER MODAL */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-lg">
+          <form onSubmit={handleUpdateOrder}>
+            <DialogHeader>
+              <DialogTitle className="text-white flex items-center gap-2">
+                <Pencil className="h-4 w-4 text-violet-400" />
+                {t("Modifier la commande")}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                {t("ID :")} <span className="font-mono">{selectedOrder?.id.slice(0, 8)}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-contact" className="text-slate-300">{t("Client CRM *")}</Label>
+                <select
+                  id="edit-contact"
+                  required
+                  value={selectedContactId}
+                  onChange={(e) => setSelectedContactId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1 text-sm shadow-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || c.phone} ({c.company || t('Sans entreprise')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-status" className="text-slate-300">{t("Statut")}</Label>
+                  <select
+                    id="edit-status"
+                    value={orderStatus}
+                    onChange={(e) => setOrderStatus(e.target.value as any)}
+                    className="flex h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1 text-sm shadow-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  >
+                    <option value="pending">{t("En Attente")}</option>
+                    <option value="paid">{t("Payée")}</option>
+                    <option value="shipped">{t("Expédiée")}</option>
+                    <option value="cancelled">{t("Annulée")}</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-payment" className="text-slate-300">{t("Méthode de Paiement")}</Label>
+                  <select
+                    id="edit-payment"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1 text-sm shadow-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  >
+                    <option value="card">{t("Carte")}</option>
+                    <option value="mobile_money">{t("Mobile Money")}</option>
+                    <option value="cash">{t("Espèces")}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Section */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1">
+                  <Label className="text-slate-200">{t("Articles commandés *")}</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleAddItem}
+                    className="text-violet-400 hover:text-violet-300 hover:bg-slate-800"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> {t("Ajouter")}
+                  </Button>
+                </div>
+
+                {products.length === 0 ? (
+                  <p className="text-xs text-amber-400">
+                    {t("Veuillez d'abord créer des produits actifs dans le catalogue.")}
+                  </p>
+                ) : (
+                  orderItems.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <div className="flex-1">
+                        <select
+                          value={item.product_id}
+                          onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
+                          className="flex h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        >
+                          <option value="" disabled>{t("Sélectionnez un produit...")}</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({format(p.price, p.currency)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-20">
+                        <Input
+                          type="number"
+                          min="1"
+                          required
+                          value={item.quantity}
+                          onChange={(e) =>
+                            handleItemChange(index, 'quantity', parseInt(e.target.value) || 1)
+                          }
+                          className="bg-slate-950 border-slate-800 text-slate-100 text-center"
+                        />
+                      </div>
+                      {orderItems.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-red-400 hover:bg-red-950/20 hover:text-red-300 h-9 w-9"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsEditOpen(false)}
+                className="text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                {t("Annuler")}
+              </Button>
+              <Button
+                type="submit"
+                disabled={products.length === 0}
+                className="bg-violet-600 hover:bg-violet-700 text-white font-medium"
+              >
+                {t("Enregistrer les modifications")}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

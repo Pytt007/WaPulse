@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { LanguageProvider } from "@/hooks/use-translation";
 import { CurrencyProvider } from "@/hooks/use-currency";
+import { ThemeProvider } from "@/hooks/use-theme";
 import "./globals.css";
 
 const inter = Inter({
@@ -41,11 +42,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full bg-slate-950 text-white font-sans">
+    <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full bg-slate-950 text-white font-sans" suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const theme = localStorage.getItem('wapulse_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                if (theme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <LanguageProvider>
           <CurrencyProvider>
-            {children}
+            <ThemeProvider>
+              {children}
+            </ThemeProvider>
           </CurrencyProvider>
         </LanguageProvider>
         <Toaster

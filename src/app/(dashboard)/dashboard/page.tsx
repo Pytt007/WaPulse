@@ -21,6 +21,7 @@ import type {
   ActivityItem,
   ConversationsSeriesPoint,
   MetricsBundle,
+  PeriodType,
   PipelineDonutData,
   ResponseTimeSummary,
 } from '@/lib/dashboard/types'
@@ -33,6 +34,7 @@ import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { useCurrency } from '@/hooks/use-currency'
+import { DateRangePicker } from '@/components/dashboard/date-range-picker'
 
 type RangeDays = 7 | 30 | 90
 
@@ -42,6 +44,7 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
 
+  const [period, setPeriod] = useState<PeriodType>('day')
   const [range, setRange] = useState<RangeDays>(30)
   // Keep a cache per range so switching tabs doesn't re-fetch what we
   // already have. Ranges the user hasn't opened yet stay null and
@@ -62,16 +65,39 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[] | null>(null)
   const [activityLoading, setActivityLoading] = useState(true)
 
-  const loadAll = useCallback(() => {
-    const db = createClient()
+  // Custom date selection states (Date objects)
+  const [isCustomRange, setIsCustomRange] = useState(false)
+  const [customStart, setCustomStart] = useState(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 3)
+    return d
+  })
+  const [customEnd, setCustomEnd] = useState(() => {
+    return new Date()
+  })
+  const [customSeries, setCustomSeries] = useState<ConversationsSeriesPoint[] | null>(null)
+  const [customSeriesLoading, setCustomSeriesLoading] = useState(false)
 
-    // Kick everything off in parallel. Each block has its own
-    // setState + finally so a slow query doesn't hold up faster
-    // sections — each widget shows its own skeleton independently.
-    void loadMetrics(db)
+  const loadMetricsData = useCallback((p: PeriodType | 'custom', start?: Date, end?: Date) => {
+    setMetricsLoading(true)
+    const db = createClient()
+    void loadMetrics(db, p, start, end)
       .then((m) => setMetrics(m))
       .catch((err) => console.error('[dashboard] metrics failed:', err))
       .finally(() => setMetricsLoading(false))
+  }, [])
+
+  const loadCustomSeries = useCallback((start: Date, end: Date) => {
+    setCustomSeriesLoading(true)
+    const db = createClient()
+    void loadConversationsSeries(db, { start, end })
+      .then((s) => setCustomSeries(s))
+      .catch((err) => console.error('[dashboard] custom series failed:', err))
+      .finally(() => setCustomSeriesLoading(false))
+  }, [])
+
+  const loadAll = useCallback(() => {
+    const db = createClient()
 
     void loadConversationsSeries(db, 30)
       .then((s) => setSeries((prev) => ({ ...prev, 30: s })))
@@ -101,6 +127,20 @@ export default function DashboardPage() {
     loadAll()
   }, [loadAll])
 
+  useEffect(() => {
+    if (isCustomRange) {
+      loadMetricsData('custom', customStart, customEnd)
+    } else {
+      loadMetricsData(period)
+    }
+  }, [isCustomRange, period, customStart, customEnd, loadMetricsData])
+
+  useEffect(() => {
+    if (isCustomRange) {
+      loadCustomSeries(customStart, customEnd)
+    }
+  }, [isCustomRange, customStart, customEnd, loadCustomSeries])
+
   // Range switch handler — kept in an event callback (not an effect)
   // so the setState calls stay out of the react-hooks/set-state-in-effect
   // rule's way. The cached bucket check means switching back to a
@@ -122,11 +162,53 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">{t("Dashboard")}</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          {t("Live analytics across conversations, contacts, deals, broadcasts, and automations.")}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">{t("Dashboard")}</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            {t("Live analytics across conversations, contacts, deals, broadcasts, and automations.")}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">{t("Période :")}</span>
+            <div className="inline-flex rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+              {(['day', 'week', 'month'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setIsCustomRange(false)
+                    setPeriod(p)
+                  }}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                    !isCustomRange && period === p ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {p === 'day' ? t("Jour") : p === 'week' ? t("Semaine") : t("Mois")}
+                </button>
+              ))}
+              <button
+                onClick={() => setIsCustomRange(true)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                  isCustomRange ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {t("Personnalisé")}
+              </button>
+            </div>
+          </div>
+
+          {isCustomRange && (
+            <DateRangePicker
+              startDate={customStart}
+              endDate={customEnd}
+              onApply={(start, end) => {
+                setCustomStart(start)
+                setCustomEnd(end)
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Metric cards */}
@@ -141,11 +223,29 @@ export default function DashboardPage() {
               icon={MessageSquare}
               delta={{
                 sign: metrics.activeConversations.previous,
-                label: deltaLabel(metrics.activeConversations.previous, 'new today vs yesterday', t),
+                label: deltaLabel(
+                  metrics.activeConversations.previous,
+                  isCustomRange
+                    ? 'new vs previous period'
+                    : period === 'week'
+                    ? 'new this week vs last week'
+                    : period === 'month'
+                    ? 'new this month vs last month'
+                    : 'new today vs yesterday',
+                  t,
+                ),
               }}
             />
             <MetricCard
-              title={t("New Contacts Today")}
+              title={
+                isCustomRange
+                  ? t("New Contacts In Selected Period")
+                  : period === 'week'
+                  ? t("New Contacts This Week")
+                  : period === 'month'
+                  ? t("New Contacts This Month")
+                  : t("New Contacts Today")
+              }
               value={metrics.newContactsToday.current.toLocaleString()}
               icon={UserPlus}
               delta={{
@@ -153,7 +253,13 @@ export default function DashboardPage() {
                   metrics.newContactsToday.current - metrics.newContactsToday.previous,
                 label: deltaLabel(
                   metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                  'vs yesterday',
+                  isCustomRange
+                    ? 'vs previous period'
+                    : period === 'week'
+                    ? 'vs last week'
+                    : period === 'month'
+                    ? 'vs last month'
+                    : 'vs yesterday',
                   t,
                 ),
               }}
@@ -165,7 +271,15 @@ export default function DashboardPage() {
               subtitle={`${metrics.openDealsCount} ${t(metrics.openDealsCount === 1 ? 'open deal' : 'open deals')}`}
             />
             <MetricCard
-              title={t("Messages Sent Today")}
+              title={
+                isCustomRange
+                  ? t("Messages Sent In Selected Period")
+                  : period === 'week'
+                  ? t("Messages Sent This Week")
+                  : period === 'month'
+                  ? t("Messages Sent This Month")
+                  : t("Messages Sent Today")
+              }
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
               delta={{
@@ -173,7 +287,13 @@ export default function DashboardPage() {
                   metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
                 label: deltaLabel(
                   metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                  'vs yesterday',
+                  isCustomRange
+                    ? 'vs previous period'
+                    : period === 'week'
+                    ? 'vs last week'
+                    : period === 'month'
+                    ? 'vs last month'
+                    : 'vs yesterday',
                   t,
                 ),
               }}
@@ -195,10 +315,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="h-full lg:col-span-3">
           <ConversationsChart
-            series={series}
-            loading={seriesLoading}
-            range={range}
-            onRangeChange={handleRangeChange}
+            series={isCustomRange ? customSeries : series}
+            loading={isCustomRange ? customSeriesLoading : seriesLoading}
+            range={isCustomRange ? 'custom' : range}
+            onRangeChange={isCustomRange ? undefined : handleRangeChange}
           />
         </div>
         <div className="h-full lg:col-span-2">
