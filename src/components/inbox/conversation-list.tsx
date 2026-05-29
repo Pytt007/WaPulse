@@ -221,7 +221,7 @@ function ConversationItem({
     <button
       onClick={handleClick}
       className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-slate-800/50",
+        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-slate-800/50 animate-slide-in-left",
         isActive && "border-l-2 border-violet-500 bg-slate-800/70"
       )}
     >

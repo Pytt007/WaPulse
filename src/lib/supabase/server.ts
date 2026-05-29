@@ -64,6 +64,11 @@ export class ServerMockQueryBuilder {
     return this
   }
 
+  is(col: string, val: unknown) {
+    this.filters.push({ col, op: 'is', val })
+    return this
+  }
+
   neq(col: string, val: unknown) {
     this.filters.push({ col, op: 'neq', val })
     return this

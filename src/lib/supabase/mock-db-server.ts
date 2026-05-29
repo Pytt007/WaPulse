@@ -145,6 +145,14 @@ export async function executeQuery(req: QueryRequest): Promise<{
         const { col, op, val } = filter
         if (op === 'eq') {
           tableData = tableData.filter((item) => item[col] === val)
+        } else if (op === 'is') {
+          tableData = tableData.filter((item) => {
+            const itemVal = item[col]
+            if (val === null) {
+              return itemVal === null || itemVal === undefined
+            }
+            return itemVal === val
+          })
         } else if (op === 'neq') {
           tableData = tableData.filter((item) => item[col] !== val)
         } else if (op === 'gte') {
@@ -254,6 +262,11 @@ export async function executeQuery(req: QueryRequest): Promise<{
         for (const filter of req.filters) {
           const { col, op, val } = filter
           if (op === 'eq' && item[col] !== val) matches = false
+          if (op === 'is') {
+            const itemVal = item[col]
+            const isMatch = val === null ? (itemVal === null || itemVal === undefined) : (itemVal === val)
+            if (!isMatch) matches = false
+          }
           if (op === 'neq' && item[col] === val) matches = false
           if (op === 'in' && !val.includes(item[col])) matches = false
         }
@@ -289,6 +302,11 @@ export async function executeQuery(req: QueryRequest): Promise<{
         for (const filter of req.filters) {
           const { col, op, val } = filter
           if (op === 'eq' && item[col] !== val) matches = false
+          if (op === 'is') {
+            const itemVal = item[col]
+            const isMatch = val === null ? (itemVal === null || itemVal === undefined) : (itemVal === val)
+            if (!isMatch) matches = false
+          }
           if (op === 'neq' && item[col] === val) matches = false
           if (op === 'in' && !val.includes(item[col])) matches = false
         }

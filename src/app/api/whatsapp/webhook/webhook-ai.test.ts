@@ -351,7 +351,7 @@ describe("Webhook AI Integration (Hybrid Shared Inbox)", () => {
     // Verify contact was created
     const finalContacts = await executeQuery({ action: "select", tableName: "contacts" });
     const createdContact = finalContacts.data.find(
-      (c: any) => c.phone === "+33699991111"
+      (c: any) => c.phone === "33699991111"
     );
     expect(createdContact).toBeDefined();
     expect(createdContact.name).toBe("Bernard Durand");

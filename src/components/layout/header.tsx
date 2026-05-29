@@ -88,9 +88,9 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           {!mounted ? (
             <div className="h-5 w-5" />
           ) : theme === "dark" ? (
-            <Sun className="h-5 w-5" />
+            <Sun className="h-5 w-5 theme-icon-spin" />
           ) : (
-            <Moon className="h-5 w-5" />
+            <Moon className="h-5 w-5 theme-icon-spin" />
           )}
         </button>
 

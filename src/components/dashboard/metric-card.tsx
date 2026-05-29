@@ -19,11 +19,12 @@ interface MetricCardProps {
   }
   /** Used instead of `delta` when the metric has a static subtitle. */
   subtitle?: string
+  className?: string
 }
 
-export function MetricCard({ title, value, icon: Icon, delta, subtitle }: MetricCardProps) {
+export function MetricCard({ title, value, icon: Icon, delta, subtitle, className }: MetricCardProps) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div className={cn("rounded-xl border border-slate-800 bg-slate-900 p-5 animate-fade-in-up hover-premium", className)}>
       <div className="flex items-start justify-between">
         <p className="text-sm font-medium text-slate-400">{title}</p>
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-500">

@@ -221,6 +221,7 @@ export default function DashboardPage() {
               title={t("Active Conversations")}
               value={metrics.activeConversations.current.toLocaleString()}
               icon={MessageSquare}
+              className="delay-75"
               delta={{
                 sign: metrics.activeConversations.previous,
                 label: deltaLabel(
@@ -248,6 +249,7 @@ export default function DashboardPage() {
               }
               value={metrics.newContactsToday.current.toLocaleString()}
               icon={UserPlus}
+              className="delay-100"
               delta={{
                 sign:
                   metrics.newContactsToday.current - metrics.newContactsToday.previous,
@@ -268,6 +270,7 @@ export default function DashboardPage() {
               title={t("Open Deals Value")}
               value={formatPrice(metrics.openDealsValue, 'XOF')}
               icon={DollarSign}
+              className="delay-150"
               subtitle={`${metrics.openDealsCount} ${t(metrics.openDealsCount === 1 ? 'open deal' : 'open deals')}`}
             />
             <MetricCard
@@ -282,6 +285,7 @@ export default function DashboardPage() {
               }
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
+              className="delay-200"
               delta={{
                 sign:
                   metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
